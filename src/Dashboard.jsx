@@ -13,7 +13,7 @@ import MealViewerModal from "./components/MealViewerModal";
 import MealLogger from "./components/MealLogger";
 import PrefectCommittee from "./components/PrefectCommittee";
 import GuestMealLogModal from "./components/GuestMealLogModal";
-import EditProfileModal from "./components/EditProfileModal"; // 🔥 Notun Modal Import
+import EditProfileModal from "./components/EditProfileModal";
 import Footer from "./components/Footer";
 
 export default function Dashboard() {
@@ -25,7 +25,6 @@ export default function Dashboard() {
   const [managersInfo, setManagersInfo] = useState([]);
   const [cashierInfo, setCashierInfo] = useState(null);
 
-  // 🔥 Notice board ke array te convert kora holo
   const [notices, setNotices] = useState([]);
 
   const [loadingList, setLoadingList] = useState(false);
@@ -36,7 +35,7 @@ export default function Dashboard() {
   const [showMealModal, setShowMealModal] = useState(false);
 
   const [showGuestLogModal, setShowGuestLogModal] = useState(false);
-  const [showEditProfile, setShowEditProfile] = useState(false); // 🔥 Edit Profile State
+  const [showEditProfile, setShowEditProfile] = useState(false);
 
   // --- UI MODALS & TOAST STATES ---
   const [toast, setToast] = useState({
@@ -75,13 +74,14 @@ export default function Dashboard() {
     fetchNotice();
   }, [navigate]);
 
-  // 🔥 Notun Notice Fetch Function
+  // 🔥 Fetch Notice with Limit to avoid heavy load
   const fetchNotice = async () => {
     try {
       const { data } = await supabase
         .from("notices")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(40); // Shudhu last 40 ta notice asbe tracking er jonno
       if (data) setNotices(data);
     } catch (error) {
       console.error("Notice error:", error);
@@ -399,7 +399,6 @@ export default function Dashboard() {
     });
   };
 
-  // 🔥 Notun Add Notice Logic (SQL title, message match)
   const handleAddNotice = () => {
     setPromptModal({
       isOpen: true,
@@ -442,21 +441,25 @@ export default function Dashboard() {
   const canViewMealList = true;
   const canLogMeals = isManager || isCashier || isMessPrefect;
 
+  // 🔥 24 Hours Validity Logic
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const displayedNotices = isSuperintendent
+    ? notices
+    : notices.filter((n) => new Date(n.created_at) > twentyFourHoursAgo);
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans transition-colors duration-500 relative overflow-hidden">
       <div className="fixed top-0 left-0 w-full h-96 bg-gradient-to-b from-emerald-500/10 to-transparent dark:from-cyan-500/5 pointer-events-none z-0"></div>
       <DashboardNavbar profile={profile} roleName={roleName} />
 
-      {/* 🔥 pt-28 kora chilo eta ekhon pt-24 holo Navbar er pashe rakhar jonno */}
       <div className="flex-1 max-w-7xl mx-auto px-4 md:px-8 pt-24 pb-12 relative z-10 w-full">
-        {/* 🔥 Notice Board Ekhon Ekdum Upore */}
+        {/* 🔥 Notice Board */}
         <div className="mb-8 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
               <i className="fas fa-bullhorn text-rose-500"></i> Notice Board
             </h3>
 
-            {/* 🔥 Add New Notice Button Moved Here */}
             {(isSuperintendent || isPrefect) && (
               <button
                 onClick={handleAddNotice}
@@ -467,30 +470,63 @@ export default function Dashboard() {
             )}
           </div>
 
-          {notices.length === 0 ? (
-            <p className="text-slate-500 text-sm font-bold">
+          {displayedNotices.length === 0 ? (
+            <p className="text-slate-500 text-sm font-bold bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
               No new notices currently available.
             </p>
           ) : (
             <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-              {notices.map((noticeItem) => (
-                <div
-                  key={noticeItem.id}
-                  className="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30"
-                >
-                  <h4 className="font-bold text-rose-700 dark:text-rose-400 mb-1">
-                    {noticeItem.title}
-                  </h4>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {noticeItem.message}
-                  </p>
-                  <span className="text-[10px] text-slate-400 font-bold block mt-2">
-                    {new Date(noticeItem.created_at).toLocaleDateString(
-                      "en-GB",
-                    )}
-                  </span>
-                </div>
-              ))}
+              {displayedNotices.map((noticeItem) => {
+                const isExpired =
+                  new Date(noticeItem.created_at) < twentyFourHoursAgo;
+
+                return (
+                  <div
+                    key={noticeItem.id}
+                    className={`p-4 rounded-xl border transition-all ${
+                      isExpired
+                        ? "bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 opacity-80"
+                        : "bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/30"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <h4
+                        className={`font-bold ${isExpired ? "text-slate-600 dark:text-slate-400" : "text-rose-700 dark:text-rose-400"}`}
+                      >
+                        {noticeItem.title}
+                      </h4>
+                      {/* 🔥 Superintendent Badges */}
+                      {isSuperintendent && isExpired && (
+                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                          Expired
+                        </span>
+                      )}
+                      {isSuperintendent && !isExpired && (
+                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                          Live
+                        </span>
+                      )}
+                    </div>
+
+                    <p
+                      className={`text-sm font-medium ${isExpired ? "text-slate-500 dark:text-slate-400" : "text-slate-700 dark:text-slate-300"}`}
+                    >
+                      {noticeItem.message}
+                    </p>
+                    <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-2">
+                      <i className="far fa-clock"></i>
+                      {new Date(noticeItem.created_at).toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -505,7 +541,6 @@ export default function Dashboard() {
                 : "xl:col-span-3 flex flex-col gap-6"
             }
           >
-            {/* 🔥 Profile Panel with onEditClick Prop passed correctly */}
             <ProfilePanel
               profile={profile}
               roleName={roleName}
@@ -857,7 +892,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🔥 Edit Profile Modal Added Here */}
+      {/* Edit Profile Modal */}
       <EditProfileModal
         isOpen={showEditProfile}
         onClose={() => setShowEditProfile(false)}
