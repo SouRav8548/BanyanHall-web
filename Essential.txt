@@ -1,0 +1,33 @@
+Organization:   Jagadish Chandra Bhawan [BANYAN HALL]
+
+
+Project name:  J C Bhawan BANYAN HALL
+
+
+Database[supabase] password:  Database#BANYAN@2026
+
+
+Project URL: https://ywcqsugefxkskzzekulg.supabase.co
+
+
+Project API keys:  sb_publishable_8BJGZLphIEfUzVLWg_lOCg_7fX_iIno
+
+
+Superintendent Account: superintendent@banyan.com
+
+						Password:  Steward#BANYAN@2026
+						
+						
+const images = [
+    "https://6aae90d0380f009d8901c663.imgix.net/sandbox/IMG_20250201_010117.jpg?h=8192&fit=crop&crop=entropy", // Ground in Night
+    "https://6aae90d0380f009d8901c663.imgix.net/sandbox/IMG_20260123_125904.jpg",  // Building
+    "https://6aae90d0380f009d8901c663.imgix.net/sandbox/IMG_20241225_112832.jpg",    //Ground under Banyan
+    "https://6aae90d0380f009d8901c663.imgix.net/sandbox/IMG_20250222_042657.jpg", // From ground
+    "https://6aae90d0380f009d8901c663.imgix.net/sandbox/IMG_20250220_042401.jpg", //    Roadpainting
+    "https://6aae90d0380f009d8901c663.imgix.net/sandbox/8d34785ffd12438ca479613343060794.jpg",   // OutCampus
+    "https://6aae90d0380f009d8901c663.imgix.net/sandbox/IMG_20250129_151017.jpg", //    Painting
+  ];
+						
+						
+						
+						http://localhost:5173/
