@@ -13,6 +13,7 @@ import MealViewerModal from "./components/MealViewerModal";
 import MealLogger from "./components/MealLogger";
 import PrefectCommittee from "./components/PrefectCommittee";
 import GuestMealLogModal from "./components/GuestMealLogModal";
+import EditProfileModal from "./components/EditProfileModal"; // 🔥 Notun Modal Import
 import Footer from "./components/Footer";
 
 export default function Dashboard() {
@@ -23,7 +24,9 @@ export default function Dashboard() {
   const [boardersList, setBoardersList] = useState([]);
   const [managersInfo, setManagersInfo] = useState([]);
   const [cashierInfo, setCashierInfo] = useState(null);
-  const [notice, setNotice] = useState(null);
+
+  // 🔥 Notice board ke array te convert kora holo
+  const [notices, setNotices] = useState([]);
 
   const [loadingList, setLoadingList] = useState(false);
   const [mealStats, setMealStats] = useState(null);
@@ -33,6 +36,7 @@ export default function Dashboard() {
   const [showMealModal, setShowMealModal] = useState(false);
 
   const [showGuestLogModal, setShowGuestLogModal] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false); // 🔥 Edit Profile State
 
   // --- UI MODALS & TOAST STATES ---
   const [toast, setToast] = useState({
@@ -71,14 +75,14 @@ export default function Dashboard() {
     fetchNotice();
   }, [navigate]);
 
+  // 🔥 Notun Notice Fetch Function
   const fetchNotice = async () => {
     try {
       const { data } = await supabase
         .from("notices")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (data && data.length > 0) setNotice(data[0]);
+        .order("created_at", { ascending: false });
+      if (data) setNotices(data);
     } catch (error) {
       console.error("Notice error:", error);
     }
@@ -255,9 +259,8 @@ export default function Dashboard() {
         const { error } = await supabase.rpc("delete_auth_user", {
           user_id: userId,
         });
-        if (error) {
-          showToast("Error deleting user: " + error.message, "error");
-        } else {
+        if (error) showToast("Error deleting user: " + error.message, "error");
+        else {
           fetchSuperintendentList();
           fetchUserData();
           showToast(`${name} has been permanently deleted.`, "success");
@@ -270,7 +273,6 @@ export default function Dashboard() {
   const handleSuspend = (userId, name) => {
     if (userId === profile.id)
       return showToast("You cannot suspend yourself!", "error");
-
     setConfirmModal({
       isOpen: true,
       title: "Suspend Boarder",
@@ -316,12 +318,9 @@ export default function Dashboard() {
     );
   };
 
-  // 🔥 MAIN FIX: SMART DEMOTION LOGIC
   const handleMakeBoarder = (userId, name) => {
     if (userId === profile.id)
       return showToast("You cannot demote yourself!", "error");
-
-    // Khuje ber kora hocche target user ke abong tar current role ki
     const targetUser = boardersList.find((b) => b.id === userId);
     const currentRole = targetUser?.roles?.role_name;
     const hasPrefectTitle = !!targetUser?.prefect_title;
@@ -330,7 +329,6 @@ export default function Dashboard() {
     let modalTitle = "Demote to Boarder";
     let modalMessage = `Demote ${name} back to standard Boarder?`;
 
-    // Safe step-down logic: User er jodi prefect title thake tobe demote korle role_id: 2 (Prefect) hobe
     if (
       (currentRole === "Manager" || currentRole === "Cashier") &&
       hasPrefectTitle
@@ -375,7 +373,6 @@ export default function Dashboard() {
     });
   };
 
-  // 🔥 FIX: CASHIER DEMOTION LOGIC
   const handleMakeCashier = (userId, name) => {
     setConfirmModal({
       isOpen: true,
@@ -383,7 +380,6 @@ export default function Dashboard() {
       message: `Appoint ${name} as Cashier?\n(Current Cashier will be demoted)`,
       type: "info",
       onConfirm: async () => {
-        // Safe check for current cashier to preserve their Prefect status if any
         const currentCashier = boardersList.find(
           (b) => b.roles?.role_name === "Cashier",
         );
@@ -394,7 +390,6 @@ export default function Dashboard() {
             .update({ role_id: revertRole })
             .eq("id", currentCashier.id);
         }
-
         await supabase.from("profiles").update({ role_id: 5 }).eq("id", userId);
         fetchSuperintendentList();
         fetchUserData();
@@ -404,6 +399,7 @@ export default function Dashboard() {
     });
   };
 
+  // 🔥 Notun Add Notice Logic (SQL title, message match)
   const handleAddNotice = () => {
     setPromptModal({
       isOpen: true,
@@ -414,7 +410,7 @@ export default function Dashboard() {
         if (msg.trim()) {
           await supabase
             .from("notices")
-            .insert([{ message: msg, author: roleName }]);
+            .insert([{ title: `${roleName} Update`, message: msg }]);
           fetchNotice();
           showToast("Notice updated successfully!", "success");
         }
@@ -443,7 +439,6 @@ export default function Dashboard() {
   const canRejectNew = isSuperintendent;
   const canSuspendActive = isSuperintendent;
   const canSeeStats = !isSuperintendent;
-
   const canViewMealList = true;
   const canLogMeals = isManager || isCashier || isMessPrefect;
 
@@ -453,23 +448,15 @@ export default function Dashboard() {
       <DashboardNavbar profile={profile} roleName={roleName} />
 
       <div className="flex-1 max-w-7xl mx-auto px-4 md:px-8 pt-28 pb-12 relative z-10 w-full">
-        {notice && (
-          <div className="mb-6 bg-indigo-500 text-white rounded-xl shadow-sm flex items-center justify-between p-3 px-6 overflow-hidden relative">
-            <div className="flex items-center gap-3 w-full animate-[marquee_20s_linear_infinite] md:animate-none">
-              <i className="fas fa-bullhorn text-indigo-200"></i>
-              <span className="font-bold text-sm">
-                <span className="text-indigo-200 mr-2">[{notice.author}]</span>
-                {notice.message}
-              </span>
-            </div>
-            {(isSuperintendent || isPrefect) && (
-              <button
-                onClick={handleAddNotice}
-                className="absolute right-2 bg-white/20 hover:bg-white/30 p-2 rounded-lg text-xs font-bold backdrop-blur-sm z-10 transition-colors"
-              >
-                Update Notice
-              </button>
-            )}
+        {/* Add Notice Button on Top for Admins */}
+        {(isSuperintendent || isPrefect) && (
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={handleAddNotice}
+              className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center gap-2"
+            >
+              <i className="fas fa-plus"></i> Add New Notice
+            </button>
           </div>
         )}
 
@@ -483,11 +470,13 @@ export default function Dashboard() {
                 : "xl:col-span-3 flex flex-col gap-6"
             }
           >
+            {/* 🔥 Profile Panel with onEditClick Prop passed correctly */}
             <ProfilePanel
               profile={profile}
               roleName={roleName}
               isSuperintendent={isSuperintendent}
               fetchUserData={fetchUserData}
+              onEditClick={() => setShowEditProfile(true)}
             />
             <HostelSlideshow />
           </div>
@@ -500,6 +489,39 @@ export default function Dashboard() {
                 isMealUpdating={isMealUpdating}
                 toggleMealStatus={toggleMealStatus}
               />
+            </div>
+          )}
+        </div>
+
+        {/* 🔥 Custom Notice Board Grid added below Header section */}
+        <div className="mb-8 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+          <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2 mb-6">
+            <i className="fas fa-bullhorn text-rose-500"></i> Notice Board
+          </h3>
+          {notices.length === 0 ? (
+            <p className="text-slate-500 text-sm font-bold">
+              No new notices currently available.
+            </p>
+          ) : (
+            <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+              {notices.map((noticeItem) => (
+                <div
+                  key={noticeItem.id}
+                  className="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30"
+                >
+                  <h4 className="font-bold text-rose-700 dark:text-rose-400 mb-1">
+                    {noticeItem.title}
+                  </h4>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    {noticeItem.message}
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-bold block mt-2">
+                    {new Date(noticeItem.created_at).toLocaleDateString(
+                      "en-GB",
+                    )}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -541,8 +563,6 @@ export default function Dashboard() {
                   <h3 className="text-lg font-black text-amber-700 dark:text-amber-400 flex items-center gap-2">
                     <i className="fas fa-user-plus"></i> Live Guest Meals
                   </h3>
-
-                  {/* 🔥 Notun button abong counter section */}
                   <div className="flex items-center gap-3">
                     {(isMessPrefect || isSuperintendent) && (
                       <button
@@ -684,7 +704,6 @@ export default function Dashboard() {
           isOpen={showGuestLogModal}
           onClose={() => setShowGuestLogModal(false)}
         />
-
         <MealViewerModal
           isOpen={showMealModal}
           onClose={() => setShowMealModal(false)}
@@ -695,17 +714,12 @@ export default function Dashboard() {
         <PrefectCommittee />
       </div>
 
-      {/* --- ALL CUSTOM MODALS --- */}
       <div
-        className={`fixed bottom-6 right-6 z-[120] px-6 py-3 rounded-xl shadow-2xl font-bold flex items-center gap-3 text-white transition-all duration-300 transform ${
-          toast.show
-            ? "translate-y-0 opacity-100"
-            : "translate-y-10 opacity-0 pointer-events-none"
-        } ${toast.type === "error" ? "bg-rose-500" : toast.type === "warning" ? "bg-amber-500" : "bg-emerald-500"}`}
+        className={`fixed bottom-6 right-6 z-[120] px-6 py-3 rounded-xl shadow-2xl font-bold flex items-center gap-3 text-white transition-all duration-300 transform ${toast.show ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0 pointer-events-none"} ${toast.type === "error" ? "bg-rose-500" : toast.type === "warning" ? "bg-amber-500" : "bg-emerald-500"}`}
       >
         <i
           className={`fas ${toast.type === "error" ? "fa-exclamation-circle" : toast.type === "warning" ? "fa-exclamation-triangle" : "fa-check-circle"}`}
-        ></i>
+        ></i>{" "}
         {toast.message}
       </div>
 
@@ -713,22 +727,10 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl relative border border-slate-200 dark:border-slate-800 text-center transform scale-100 transition-transform">
             <div
-              className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
-                confirmModal.type === "danger"
-                  ? "bg-rose-100 text-rose-500 dark:bg-rose-500/20"
-                  : confirmModal.type === "warning"
-                    ? "bg-amber-100 text-amber-500 dark:bg-amber-500/20"
-                    : "bg-indigo-100 text-indigo-500 dark:bg-indigo-500/20"
-              }`}
+              className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${confirmModal.type === "danger" ? "bg-rose-100 text-rose-500 dark:bg-rose-500/20" : confirmModal.type === "warning" ? "bg-amber-100 text-amber-500 dark:bg-amber-500/20" : "bg-indigo-100 text-indigo-500 dark:bg-indigo-500/20"}`}
             >
               <i
-                className={`fas text-2xl ${
-                  confirmModal.type === "danger"
-                    ? "fa-trash-alt"
-                    : confirmModal.type === "warning"
-                      ? "fa-exclamation-triangle"
-                      : "fa-question-circle"
-                }`}
+                className={`fas text-2xl ${confirmModal.type === "danger" ? "fa-trash-alt" : confirmModal.type === "warning" ? "fa-exclamation-triangle" : "fa-question-circle"}`}
               ></i>
             </div>
             <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">
@@ -737,7 +739,6 @@ export default function Dashboard() {
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-6 whitespace-pre-wrap">
               {confirmModal.message}
             </p>
-
             <div className="flex justify-center gap-3">
               <button
                 onClick={() => setConfirmModal({ isOpen: false })}
@@ -747,13 +748,7 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={confirmModal.onConfirm}
-                className={`px-5 py-2.5 rounded-xl font-bold text-white shadow-md transition-colors ${
-                  confirmModal.type === "danger"
-                    ? "bg-rose-500 hover:bg-rose-600"
-                    : confirmModal.type === "warning"
-                      ? "bg-amber-500 hover:bg-amber-600"
-                      : "bg-indigo-500 hover:bg-indigo-600"
-                }`}
+                className={`px-5 py-2.5 rounded-xl font-bold text-white shadow-md transition-colors ${confirmModal.type === "danger" ? "bg-rose-500 hover:bg-rose-600" : confirmModal.type === "warning" ? "bg-amber-500 hover:bg-amber-600" : "bg-indigo-500 hover:bg-indigo-600"}`}
               >
                 Confirm
               </button>
@@ -771,7 +766,6 @@ export default function Dashboard() {
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
               {promptModal.message}
             </p>
-
             <input
               type="text"
               value={promptModal.inputValue}
@@ -782,7 +776,6 @@ export default function Dashboard() {
               placeholder="Type here..."
               autoFocus
             />
-
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setPromptModal({ isOpen: false })}
@@ -814,7 +807,6 @@ export default function Dashboard() {
               </span>
               :
             </p>
-
             <div className="mb-6 relative">
               <label className="absolute -top-2 left-3 text-[10px] font-bold text-slate-500 bg-white dark:bg-slate-900 px-1">
                 Select Role
@@ -838,7 +830,6 @@ export default function Dashboard() {
               </select>
               <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
             </div>
-
             <div className="flex justify-end gap-3">
               <button
                 onClick={() =>
@@ -863,6 +854,14 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* 🔥 Edit Profile Modal Added Here */}
+      <EditProfileModal
+        isOpen={showEditProfile}
+        onClose={() => setShowEditProfile(false)}
+        profile={profile}
+        fetchProfile={fetchUserData}
+      />
 
       <Footer />
     </div>
