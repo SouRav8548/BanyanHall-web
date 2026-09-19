@@ -447,18 +447,53 @@ export default function Dashboard() {
       <div className="fixed top-0 left-0 w-full h-96 bg-gradient-to-b from-emerald-500/10 to-transparent dark:from-cyan-500/5 pointer-events-none z-0"></div>
       <DashboardNavbar profile={profile} roleName={roleName} />
 
-      <div className="flex-1 max-w-7xl mx-auto px-4 md:px-8 pt-28 pb-12 relative z-10 w-full">
-        {/* Add Notice Button on Top for Admins */}
-        {(isSuperintendent || isPrefect) && (
-          <div className="flex justify-end mb-4">
-            <button
-              onClick={handleAddNotice}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors flex items-center gap-2"
-            >
-              <i className="fas fa-plus"></i> Add New Notice
-            </button>
+      {/* 🔥 pt-28 kora chilo eta ekhon pt-24 holo Navbar er pashe rakhar jonno */}
+      <div className="flex-1 max-w-7xl mx-auto px-4 md:px-8 pt-24 pb-12 relative z-10 w-full">
+        {/* 🔥 Notice Board Ekhon Ekdum Upore */}
+        <div className="mb-8 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
+              <i className="fas fa-bullhorn text-rose-500"></i> Notice Board
+            </h3>
+
+            {/* 🔥 Add New Notice Button Moved Here */}
+            {(isSuperintendent || isPrefect) && (
+              <button
+                onClick={handleAddNotice}
+                className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-colors flex items-center gap-2"
+              >
+                <i className="fas fa-plus"></i> Add New Notice
+              </button>
+            )}
           </div>
-        )}
+
+          {notices.length === 0 ? (
+            <p className="text-slate-500 text-sm font-bold">
+              No new notices currently available.
+            </p>
+          ) : (
+            <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+              {notices.map((noticeItem) => (
+                <div
+                  key={noticeItem.id}
+                  className="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30"
+                >
+                  <h4 className="font-bold text-rose-700 dark:text-rose-400 mb-1">
+                    {noticeItem.title}
+                  </h4>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    {noticeItem.message}
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-bold block mt-2">
+                    {new Date(noticeItem.created_at).toLocaleDateString(
+                      "en-GB",
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <ManagerBanner managersInfo={managersInfo} cashierInfo={cashierInfo} />
 
@@ -489,39 +524,6 @@ export default function Dashboard() {
                 isMealUpdating={isMealUpdating}
                 toggleMealStatus={toggleMealStatus}
               />
-            </div>
-          )}
-        </div>
-
-        {/* 🔥 Custom Notice Board Grid added below Header section */}
-        <div className="mb-8 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
-          <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2 mb-6">
-            <i className="fas fa-bullhorn text-rose-500"></i> Notice Board
-          </h3>
-          {notices.length === 0 ? (
-            <p className="text-slate-500 text-sm font-bold">
-              No new notices currently available.
-            </p>
-          ) : (
-            <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-              {notices.map((noticeItem) => (
-                <div
-                  key={noticeItem.id}
-                  className="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30"
-                >
-                  <h4 className="font-bold text-rose-700 dark:text-rose-400 mb-1">
-                    {noticeItem.title}
-                  </h4>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {noticeItem.message}
-                  </p>
-                  <span className="text-[10px] text-slate-400 font-bold block mt-2">
-                    {new Date(noticeItem.created_at).toLocaleDateString(
-                      "en-GB",
-                    )}
-                  </span>
-                </div>
-              ))}
             </div>
           )}
         </div>
