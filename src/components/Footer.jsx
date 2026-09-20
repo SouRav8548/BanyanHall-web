@@ -3,7 +3,7 @@ export default function Footer() {
     <footer className="w-full bg-slate-900 text-slate-300 py-4 border-t border-slate-800 mt-auto">
       <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
         {/* Brand Info */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" id="support">
           <i className="fas fa-utensils text-emerald-400"></i>
           <span className="font-black text-white tracking-wider">
             Banyan Hall
@@ -34,6 +34,13 @@ export default function Footer() {
           >
             <i className="fab fa-twitter text-xs"></i>
           </a> */}
+          {/* 🔥 New Browser/Website Icon (Added between FB and YT) */}
+          <a
+            href="https://banyanhall.wordpress.com/"
+            className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+          >
+            <i className="fas fa-globe text-sm"></i>
+          </a>
           {/* <a
             href="https://linkedin.com"
             target="_blank"

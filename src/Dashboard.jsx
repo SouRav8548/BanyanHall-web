@@ -724,26 +724,27 @@ export default function Dashboard() {
             <KitchenReport mealStats={mealStats} loadingList={loadingList} />
           </>
         )}
-
-        {(isSuperintendent || isPrefect) && (
-          <HostelDirectory
-            boardersList={boardersList}
-            loadingList={loadingList}
-            isSuperintendent={isSuperintendent}
-            isMessPrefect={isMessPrefect}
-            canApproveNew={canApproveNew}
-            canRejectNew={canRejectNew}
-            canSuspendActive={canSuspendActive}
-            onRefresh={fetchSuperintendentList}
-            handleApprove={handleApprove}
-            handleReject={handleReject}
-            handleSuspend={handleSuspend}
-            handleMakePrefect={handleMakePrefect}
-            handleMakeBoarder={handleMakeBoarder}
-            handleMakeManager={handleMakeManager}
-            handleMakeCashier={handleMakeCashier}
-          />
-        )}
+        <div id="directory">
+          {(isSuperintendent || isPrefect) && (
+            <HostelDirectory
+              boardersList={boardersList}
+              loadingList={loadingList}
+              isSuperintendent={isSuperintendent}
+              isMessPrefect={isMessPrefect}
+              canApproveNew={canApproveNew}
+              canRejectNew={canRejectNew}
+              canSuspendActive={canSuspendActive}
+              onRefresh={fetchSuperintendentList}
+              handleApprove={handleApprove}
+              handleReject={handleReject}
+              handleSuspend={handleSuspend}
+              handleMakePrefect={handleMakePrefect}
+              handleMakeBoarder={handleMakeBoarder}
+              handleMakeManager={handleMakeManager}
+              handleMakeCashier={handleMakeCashier}
+            />
+          )}
+        </div>
 
         <GuestMealLogModal
           isOpen={showGuestLogModal}

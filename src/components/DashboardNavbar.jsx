@@ -178,9 +178,10 @@ export default function DashboardNavbar({ profile, roleName }) {
               <i className="fas fa-border-all w-4 text-center"></i> Dashboard
             </span>
             <span
-              onClick={() => {
+              onClick={async () => {
                 setIsMobileMenuOpen(false);
-                navigate("/");
+                await supabase.auth.signOut(); // Supabase theke user log out korbe
+                window.location.href = "/"; // 🔥 Puro app fresh kore Home e pathabe
               }}
               className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
             >
