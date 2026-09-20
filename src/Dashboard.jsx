@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import DashboardNavbar from "./components/DashboardNavbar";
 import ManagerBanner from "./components/ManagerBanner";
 import ProfilePanel from "./components/ProfilePanel";
+import UpdatePasswordModal from "./components/UpdatePasswordModal";
 import HostelSlideshow from "./components/HostelSlideshow";
 import MealControl from "./components/MealControl";
 import KitchenReport from "./components/KitchenReport";
@@ -912,7 +913,7 @@ export default function Dashboard() {
         roleName={roleName}
         prefectTitle={profile?.prefect_title}
       />
-
+      <UpdatePasswordModal />
       <Footer />
     </div>
   );
