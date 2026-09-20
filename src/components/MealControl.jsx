@@ -6,6 +6,7 @@ export default function MealControl({
   roleName,
   isMealUpdating,
   toggleMealStatus,
+  onOpenGuestHistory, // 🔥 Notun Prop Add Kora Holo
 }) {
   const [updatingGuest, setUpdatingGuest] = useState(false);
   const [prices, setPrices] = useState({ veg: 0, egg: 0, fish: 0, chicken: 0 });
@@ -17,7 +18,6 @@ export default function MealControl({
     chicken: "",
   });
 
-  // 🔥 Smart Time Tracking State
   const [mealWindow, setMealWindow] = useState({
     type: "Lunch",
     isLocked: false,
@@ -31,11 +31,11 @@ export default function MealControl({
   useEffect(() => {
     fetchPrices();
     checkMealWindow();
-    checkAndAutoLock(); // 🔥 Auto-Lock function initial check
+    checkAndAutoLock();
 
     const interval = setInterval(() => {
       checkMealWindow();
-      checkAndAutoLock(); // 🔥 Proti minute e check korbe
+      checkAndAutoLock();
     }, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -53,10 +53,10 @@ export default function MealControl({
     let isLocked = false;
     let closeText = "6:30 AM";
 
-    const LUNCH_CLOSE_TIME = 6 * 60 + 30; // 6:30 AM
-    const DINNER_OPEN_TIME = 11 * 60; // 11:00 AM
-    const DINNER_CLOSE_TIME = 18 * 60; // 6:00 PM
-    const LUNCH_OPEN_TIME = 22 * 60; // 10:00 PM
+    const LUNCH_CLOSE_TIME = 6 * 60 + 30;
+    const DINNER_OPEN_TIME = 11 * 60;
+    const DINNER_CLOSE_TIME = 18 * 60;
+    const LUNCH_OPEN_TIME = 22 * 60;
 
     if (timeInMinutes >= LUNCH_OPEN_TIME || timeInMinutes < LUNCH_CLOSE_TIME) {
       type = "Lunch";
@@ -88,7 +88,6 @@ export default function MealControl({
     setMealWindow({ type, isLocked, closeText });
   };
 
-  // 🔥 NOTUN LOGIC: Manager Lock na korle System nijei Lock & Save korbe
   const checkAndAutoLock = async () => {
     const now = new Date();
     const istTime = new Date(
@@ -101,18 +100,14 @@ export default function MealControl({
 
     let targetSession = null;
 
-    // Sokal 8:30 theke Sokal 11:00 er modhe auto-lock hobe (Jodi manager vule jay)
     if (timeInMinutes >= 510 && timeInMinutes < 660) {
       targetSession = "Morning";
-    }
-    // Rat 8:00 theke Rat 10:00 er modhe auto-lock hobe
-    else if (timeInMinutes >= 1200 && timeInMinutes < 1320) {
+    } else if (timeInMinutes >= 1200 && timeInMinutes < 1320) {
       targetSession = "Dinner";
     }
 
     if (!targetSession) return;
 
-    // Check korbe je aage theke manager manually lock koreche kina
     const { data: existingLogs } = await supabase
       .from("meal_logs")
       .select("id")
@@ -120,9 +115,8 @@ export default function MealControl({
       .eq("meal_session", targetSession)
       .limit(1);
 
-    if (existingLogs && existingLogs.length > 0) return; // Already locked, so kichu korbe na
+    if (existingLogs && existingLogs.length > 0) return;
 
-    // 🔥 Auto-Lock & Save process start
     const { data: validUsers } = await supabase
       .from("profiles")
       .select(
@@ -138,7 +132,7 @@ export default function MealControl({
     const logsToInsert = [];
     const guestHistoryToInsert = [];
     const guestIdsToReset = [];
-    const finalMenuName = "Rice & Dal (Auto-Saved)"; // System auto save korle ei nam ta default thakbe
+    const finalMenuName = "Rice & Dal (Auto-Saved)";
 
     validUsers.forEach((u) => {
       if (u.roles?.role_name === "Superintendent") return;
@@ -362,17 +356,30 @@ export default function MealControl({
             ></i>{" "}
             Add Guest Meals
           </h3>
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* 🔥 NEW HISTORY BUTTON FOR ALL BOARDERS */}
+            {onOpenGuestHistory && (
+              <button
+                onClick={onOpenGuestHistory}
+                className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-[10px] sm:text-xs border border-amber-200 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors flex items-center gap-1.5"
+                title="View Guest Meal History"
+              >
+                <i className="fas fa-history"></i>{" "}
+                <span className="hidden sm:inline">History</span>
+              </button>
+            )}
+
             {isMessPrefect && (
               <button
                 onClick={() => setShowPriceModal(true)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 transition-colors"
+                className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 transition-colors"
                 title="Edit Guest Meal Prices"
               >
-                <i className="fas fa-cog"></i>
+                <i className="fas fa-cog text-xs sm:text-sm"></i>
               </button>
             )}
-            <span className="px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold text-xs border border-indigo-200 dark:border-indigo-500/20">
+            <span className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold text-[10px] sm:text-xs border border-indigo-200 dark:border-indigo-500/20 whitespace-nowrap">
               Total: {totalGuestMeals}
             </span>
           </div>
@@ -389,7 +396,7 @@ export default function MealControl({
           )}
         </p>
 
-        {/* 🔥 Responsive UI Grid for Guest Items */}
+        {/* Responsive UI Grid for Guest Items */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Veg Guest */}
           <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm gap-1">

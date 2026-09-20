@@ -568,6 +568,7 @@ export default function Dashboard() {
                 roleName={roleName}
                 isMealUpdating={isMealUpdating}
                 toggleMealStatus={toggleMealStatus}
+                onOpenGuestHistory={() => setIsGuestHistoryOpen(true)} // 🔥 Ei line ta add korun
               />
             </div>
           )}
