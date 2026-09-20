@@ -10,7 +10,16 @@ export default function UpdatePasswordModal() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 🔥 Supabase theke password recovery event track kora hocche
+    // URL-e type=recovery thakle ba Supabase event trigger hole modal open hobe
+    const checkRecovery = () => {
+      const hash = window.location.hash;
+      if (hash.includes("type=recovery") || hash.includes("access_token")) {
+        setIsOpen(true);
+      }
+    };
+
+    checkRecovery();
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === "PASSWORD_RECOVERY") {
@@ -18,11 +27,6 @@ export default function UpdatePasswordModal() {
         }
       },
     );
-
-    // Fallback: URL e recovery token thakle modal open hobe
-    if (window.location.hash.includes("type=recovery")) {
-      setIsOpen(true);
-    }
 
     return () => {
       authListener.subscription.unsubscribe();
@@ -48,8 +52,9 @@ export default function UpdatePasswordModal() {
       setMessage("Password updated successfully! Redirecting...");
       setTimeout(() => {
         setIsOpen(false);
-        window.location.hash = ""; // URL er extra token muche fela
+        window.location.hash = ""; // URL clean kora
         navigate("/dashboard");
+        window.location.reload();
       }, 2000);
     }
     setLoading(false);
