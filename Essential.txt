@@ -31,3 +31,9 @@ const images = [
 						
 						
 						http://localhost:5173/
+
+
+
+
+Step 5: Code "Inject" (Sync) Korun
+Ei command-ta apnar dist folder-er sob code (HTML, CSS, JS) Android project-er bhitor inject ba sync kore debe. Future-e apni web code-e kono change korle shudhu       npm run build       &      npx cap sync     korlei hobe.
