@@ -61,10 +61,10 @@ export default function GuestMealLogModal({ isOpen, onClose }) {
               <thead className="bg-slate-50 dark:bg-slate-950/50 sticky top-0 z-10">
                 <tr className="border-b border-slate-200 dark:border-slate-800">
                   <th className="p-3 font-bold text-[10px] uppercase text-slate-500">
-                    Date & Time
+                    Date & Session
                   </th>
                   <th className="p-3 font-bold text-[10px] uppercase text-slate-500">
-                    Host Name
+                    Host Details
                   </th>
                   <th className="p-3 font-bold text-[10px] uppercase text-slate-500 text-right">
                     Meal Breakup
@@ -86,6 +86,12 @@ export default function GuestMealLogModal({ isOpen, onClose }) {
                         })}
                       </div>
                       <div className="text-[10px] text-slate-500 font-medium">
+                        <span className="font-bold text-amber-600 dark:text-amber-500">
+                          {log.meal_session === "Morning"
+                            ? "Lunch"
+                            : log.meal_session || "Dinner"}
+                        </span>{" "}
+                        •{" "}
                         {new Date(log.created_at).toLocaleTimeString("en-US", {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -93,12 +99,23 @@ export default function GuestMealLogModal({ isOpen, onClose }) {
                       </div>
                     </td>
                     <td className="p-3">
-                      <span className="font-bold text-sm text-slate-800 dark:text-slate-200">
+                      <div className="font-bold text-sm text-slate-800 dark:text-slate-200">
                         {log.full_name}
-                      </span>
-                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                        Room: {log.room_no || "N/A"}
-                      </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                          Room: {log.room_no || "N/A"}
+                        </span>
+                        {log.mobile_number && (
+                          <a
+                            href={`tel:${log.mobile_number}`}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20 hover:underline flex items-center gap-1"
+                          >
+                            <i className="fas fa-phone-alt"></i>{" "}
+                            {log.mobile_number}
+                          </a>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3 text-right">
                       <div className="flex justify-end gap-1.5 text-[10px] font-bold">

@@ -24,22 +24,23 @@ export default function MealControl({
     closeText: "6:30 AM",
   });
 
-  // Check if current user is Mess Prefect
   const isMessPrefect =
     roleName === "Prefect Committee" &&
     profile?.prefect_title === "Mess Prefect";
 
   useEffect(() => {
     fetchPrices();
-    checkMealWindow(); // Prothom bar component load hole check korbe
+    checkMealWindow();
+    checkAndAutoLock(); // 🔥 Auto-Lock function initial check
 
-    // Proti 1 minute (60000ms) por por time automatically update hobe
-    const interval = setInterval(checkMealWindow, 60000);
+    const interval = setInterval(() => {
+      checkMealWindow();
+      checkAndAutoLock(); // 🔥 Proti minute e check korbe
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const checkMealWindow = () => {
-    // 🕒 IST (Indian Standard Time) calculation
     const now = new Date();
     const istTime = new Date(
       now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
@@ -52,38 +53,30 @@ export default function MealControl({
     let isLocked = false;
     let closeText = "6:30 AM";
 
-    // 🕒 TIME LIMITS IN MINUTES
     const LUNCH_CLOSE_TIME = 6 * 60 + 30; // 6:30 AM
     const DINNER_OPEN_TIME = 11 * 60; // 11:00 AM
     const DINNER_CLOSE_TIME = 18 * 60; // 6:00 PM
     const LUNCH_OPEN_TIME = 22 * 60; // 10:00 PM
 
-    // Rule 1: Rat 10:00 theke Sokal 6:30 (Lunch Open)
     if (timeInMinutes >= LUNCH_OPEN_TIME || timeInMinutes < LUNCH_CLOSE_TIME) {
       type = "Lunch";
       isLocked = false;
       closeText = "6:30 AM";
-    }
-    // Rule 2: Sokal 6:30 theke Sokal 11:00 (Lunch Closed / Locked)
-    else if (
+    } else if (
       timeInMinutes >= LUNCH_CLOSE_TIME &&
       timeInMinutes < DINNER_OPEN_TIME
     ) {
       type = "Lunch";
       isLocked = true;
       closeText = "6:30 AM";
-    }
-    // Rule 3: Sokal 11:00 theke Sandhya 6:00 (Dinner Open)
-    else if (
+    } else if (
       timeInMinutes >= DINNER_OPEN_TIME &&
       timeInMinutes < DINNER_CLOSE_TIME
     ) {
       type = "Dinner";
       isLocked = false;
       closeText = "6:00 PM";
-    }
-    // Rule 4: Sandhya 6:00 theke Rat 10:00 (Dinner Closed / Locked)
-    else if (
+    } else if (
       timeInMinutes >= DINNER_CLOSE_TIME &&
       timeInMinutes < LUNCH_OPEN_TIME
     ) {
@@ -93,6 +86,146 @@ export default function MealControl({
     }
 
     setMealWindow({ type, isLocked, closeText });
+  };
+
+  // 🔥 NOTUN LOGIC: Manager Lock na korle System nijei Lock & Save korbe
+  const checkAndAutoLock = async () => {
+    const now = new Date();
+    const istTime = new Date(
+      now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+    );
+    const hour = istTime.getHours();
+    const minute = istTime.getMinutes();
+    const timeInMinutes = hour * 60 + minute;
+    const logDate = istTime.toISOString().split("T")[0];
+
+    let targetSession = null;
+
+    // Sokal 8:30 theke Sokal 11:00 er modhe auto-lock hobe (Jodi manager vule jay)
+    if (timeInMinutes >= 510 && timeInMinutes < 660) {
+      targetSession = "Morning";
+    }
+    // Rat 8:00 theke Rat 10:00 er modhe auto-lock hobe
+    else if (timeInMinutes >= 1200 && timeInMinutes < 1320) {
+      targetSession = "Dinner";
+    }
+
+    if (!targetSession) return;
+
+    // Check korbe je aage theke manager manually lock koreche kina
+    const { data: existingLogs } = await supabase
+      .from("meal_logs")
+      .select("id")
+      .eq("log_date", logDate)
+      .eq("meal_session", targetSession)
+      .limit(1);
+
+    if (existingLogs && existingLogs.length > 0) return; // Already locked, so kichu korbe na
+
+    // 🔥 Auto-Lock & Save process start
+    const { data: validUsers } = await supabase
+      .from("profiles")
+      .select(
+        "id, full_name, room_no, mobile_number, meal_status, guest_veg_count, guest_egg_count, guest_fish_count, guest_chicken_count, roles(role_name)",
+      )
+      .eq("is_approved", true)
+      .or(
+        "meal_status.eq.true,guest_veg_count.gt.0,guest_egg_count.gt.0,guest_fish_count.gt.0,guest_chicken_count.gt.0",
+      );
+
+    if (!validUsers || validUsers.length === 0) return;
+
+    const logsToInsert = [];
+    const guestHistoryToInsert = [];
+    const guestIdsToReset = [];
+    const finalMenuName = "Rice & Dal (Auto-Saved)"; // System auto save korle ei nam ta default thakbe
+
+    validUsers.forEach((u) => {
+      if (u.roles?.role_name === "Superintendent") return;
+
+      if (u.meal_status) {
+        logsToInsert.push({
+          boarder_id: u.id,
+          log_date: logDate,
+          meal_session: targetSession,
+          menu_name: finalMenuName,
+          is_guest: false,
+        });
+      }
+
+      const gTotal =
+        (u.guest_veg_count || 0) +
+        (u.guest_egg_count || 0) +
+        (u.guest_fish_count || 0) +
+        (u.guest_chicken_count || 0);
+      if (gTotal > 0) {
+        for (let i = 0; i < (u.guest_veg_count || 0); i++)
+          logsToInsert.push({
+            boarder_id: u.id,
+            log_date: logDate,
+            meal_session: targetSession,
+            menu_name: finalMenuName,
+            is_guest: true,
+            guest_pref: "Veg",
+          });
+        for (let i = 0; i < (u.guest_egg_count || 0); i++)
+          logsToInsert.push({
+            boarder_id: u.id,
+            log_date: logDate,
+            meal_session: targetSession,
+            menu_name: finalMenuName,
+            is_guest: true,
+            guest_pref: "Egg",
+          });
+        for (let i = 0; i < (u.guest_fish_count || 0); i++)
+          logsToInsert.push({
+            boarder_id: u.id,
+            log_date: logDate,
+            meal_session: targetSession,
+            menu_name: finalMenuName,
+            is_guest: true,
+            guest_pref: "Fish",
+          });
+        for (let i = 0; i < (u.guest_chicken_count || 0); i++)
+          logsToInsert.push({
+            boarder_id: u.id,
+            log_date: logDate,
+            meal_session: targetSession,
+            menu_name: finalMenuName,
+            is_guest: true,
+            guest_pref: "Chicken",
+          });
+
+        guestIdsToReset.push(u.id);
+        guestHistoryToInsert.push({
+          boarder_id: u.id,
+          full_name: u.full_name || "Unknown",
+          room_no: u.room_no || "N/A",
+          mobile_number: u.mobile_number || "N/A",
+          meal_session: targetSession,
+          veg_count: u.guest_veg_count || 0,
+          egg_count: u.guest_egg_count || 0,
+          fish_count: u.guest_fish_count || 0,
+          chicken_count: u.guest_chicken_count || 0,
+        });
+      }
+    });
+
+    if (logsToInsert.length > 0)
+      await supabase.from("meal_logs").insert(logsToInsert);
+    if (guestHistoryToInsert.length > 0)
+      await supabase.from("guest_meal_logs").insert(guestHistoryToInsert);
+    if (guestIdsToReset.length > 0) {
+      await supabase
+        .from("profiles")
+        .update({
+          guest_veg_count: 0,
+          guest_egg_count: 0,
+          guest_fish_count: 0,
+          guest_chicken_count: 0,
+        })
+        .in("id", guestIdsToReset);
+    }
   };
 
   const fetchPrices = async () => {
@@ -119,13 +252,11 @@ export default function MealControl({
 
   const updateGuestCount = async (type, increment) => {
     if (!profile || updatingGuest || mealWindow.isLocked) return;
-
     const column = `guest_${type}_count`;
     const currentCount = profile[column] || 0;
     const newCount = increment
       ? currentCount + 1
       : Math.max(0, currentCount - 1);
-
     if (currentCount === newCount) return;
 
     setUpdatingGuest(true);
@@ -133,7 +264,6 @@ export default function MealControl({
       .from("profiles")
       .update({ [column]: newCount })
       .eq("id", profile.id);
-
     if (error) {
       alert("Error updating guest meal: " + error.message);
     } else {
@@ -153,7 +283,6 @@ export default function MealControl({
         chicken_price: parseInt(newPrices.chicken),
       })
       .eq("id", 1);
-
     if (error) {
       alert("Error saving prices: " + error.message);
     } else {
