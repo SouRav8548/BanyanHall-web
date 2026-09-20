@@ -16,31 +16,45 @@ export default function MyMealHistoryModal({
   const [month, setMonth] = useState(currentDate.getMonth() + 1);
   const [year, setYear] = useState(currentDate.getFullYear());
 
+  // 🔥 Notun Date State Add Kora Holo
+  const [day, setDay] = useState("All");
+
   // 🔥 Smart Role Checking for Admin Mode
   const isGlobalAdmin =
     roleName === "Manager" ||
     (roleName === "Prefect Committee" &&
       ["Maintenance", "Mess Prefect", "Auditor"].includes(prefectTitle));
 
+  // Mash ba Bochor change hole Date automatically 'All' e reset hoye jabe
+  useEffect(() => {
+    setDay("All");
+  }, [month, year]);
+
   useEffect(() => {
     if (isOpen && profileId) fetchHistory();
-  }, [isOpen, profileId, month, year, viewMode]);
+  }, [isOpen, profileId, month, year, day, viewMode]); // 'day' ke dependency te add kora holo
 
   const fetchHistory = async () => {
     setLoading(true);
 
-    const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-    const endDate = new Date(year, month, 0).toISOString().split("T")[0];
-
-    // Added profiles(full_name, room_no) to fetch boarder details for 'all' mode
     let query = supabase
       .from("meal_logs")
       .select(
         "log_date, meal_session, menu_name, boarder_id, profiles(full_name, room_no)",
       )
-      .gte("log_date", startDate)
-      .lte("log_date", endDate)
       .order("log_date", { ascending: false });
+
+    // 🔥 Date Filter Logic
+    if (day === "All") {
+      // Puro masher range
+      const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+      const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+      query = query.gte("log_date", startDate).lte("log_date", endDate);
+    } else {
+      // Nirdishto ekta din
+      const exactDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      query = query.eq("log_date", exactDate);
+    }
 
     // Jodi admin na hoy ba "My History" dekhte chay, tobe shudhu tar id diye filter korbe
     if (!isGlobalAdmin || viewMode === "me") {
@@ -59,6 +73,10 @@ export default function MyMealHistoryModal({
   };
 
   if (!isOpen) return null;
+
+  // Selected masher total din koto gulo (jemon Feb te 28/29, Jan te 31) seta ber kora holo
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
@@ -137,6 +155,25 @@ export default function MyMealHistoryModal({
                 ].map((y) => (
                   <option key={y} value={y}>
                     {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 🔥 New Date Dropdown */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">
+                Date
+              </label>
+              <select
+                value={day}
+                onChange={(e) => setDay(e.target.value)}
+                className="px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 cursor-pointer"
+              >
+                <option value="All">All Days</option>
+                {daysArray.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
                   </option>
                 ))}
               </select>
