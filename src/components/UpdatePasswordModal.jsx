@@ -10,26 +10,34 @@ export default function UpdatePasswordModal() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // URL-e type=recovery thakle ba Supabase event trigger hole modal open hobe
-    const checkRecovery = () => {
+    // URL-e recovery token thakle modal-ke open korbe ebong hide hote debe na
+    const checkRecoveryHash = () => {
       const hash = window.location.hash;
       if (hash.includes("type=recovery") || hash.includes("access_token")) {
         setIsOpen(true);
       }
     };
 
-    checkRecovery();
+    checkRecoveryHash();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "PASSWORD_RECOVERY") {
+    // Supabase auth state change track kora
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        const hash = window.location.hash;
+        if (
+          hash.includes("type=recovery") ||
+          hash.includes("access_token") ||
+          event === "PASSWORD_RECOVERY"
+        ) {
           setIsOpen(true);
         }
-      },
-    );
+      }
+    });
 
     return () => {
-      authListener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -42,29 +50,34 @@ export default function UpdatePasswordModal() {
     setLoading(true);
     setMessage("");
 
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
+    try {
+      // Database-e custom password update kora
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
 
-    if (error) {
-      setMessage("Error: " + error.message);
-    } else {
-      setMessage("Password updated successfully! Redirecting...");
-      setTimeout(() => {
+      if (error) throw error;
+
+      setMessage("Password updated successfully! Logging out...");
+
+      // 2 second por logout korie login page e pathiye debe
+      setTimeout(async () => {
+        await supabase.auth.signOut(); // 🔥 Logout kora holo
         setIsOpen(false);
         window.location.hash = ""; // URL clean kora
-        navigate("/dashboard");
-        window.location.reload();
+        navigate("/"); // 🔥 Login page e redirect
       }, 2000);
+    } catch (err) {
+      setMessage("Error: " + err.message);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl relative border border-slate-200 dark:border-slate-800 text-center animate-fade-in-up">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-fade-in-up">
         <div className="w-16 h-16 mx-auto rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-500 flex items-center justify-center mb-4">
           <i className="fas fa-lock text-2xl"></i>
         </div>
@@ -73,7 +86,7 @@ export default function UpdatePasswordModal() {
           Set New Password
         </h2>
         <p className="text-sm font-medium text-slate-500 mb-6">
-          Type a strong password to secure your account.
+          Enter your new custom password below.
         </p>
 
         <form onSubmit={handleUpdatePassword}>
@@ -102,7 +115,7 @@ export default function UpdatePasswordModal() {
             {loading ? (
               <i className="fas fa-circle-notch fa-spin"></i>
             ) : (
-              "Update Password"
+              "Update & Logout"
             )}
           </button>
         </form>
