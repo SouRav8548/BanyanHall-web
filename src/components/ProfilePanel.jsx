@@ -31,7 +31,7 @@ export default function ProfilePanel({
     setMessage("");
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + "/dashboard",
+        redirectTo: window.location.origin + "/UpdatePasswordModal", // 🔥 Ei URL ta update kora holo
       });
       if (error) throw error;
       setMessage("Password reset link sent to your email!");
