@@ -6,7 +6,7 @@ export default function MealControl({
   roleName,
   isMealUpdating,
   toggleMealStatus,
-  onOpenGuestHistory, // 🔥 Notun Prop Add Kora Holo
+  onOpenGuestHistory,
 }) {
   const [updatingGuest, setUpdatingGuest] = useState(false);
   const [prices, setPrices] = useState({ veg: 0, egg: 0, fish: 0, chicken: 0 });
@@ -18,10 +18,11 @@ export default function MealControl({
     chicken: "",
   });
 
+  // 🔥 Smart Time Tracking State with Countdown
   const [mealWindow, setMealWindow] = useState({
     type: "Lunch",
     isLocked: false,
-    closeText: "6:30 AM",
+    countdown: "",
   });
 
   const isMessPrefect =
@@ -30,62 +31,92 @@ export default function MealControl({
 
   useEffect(() => {
     fetchPrices();
-    checkMealWindow();
+    updateWindowStatus();
     checkAndAutoLock();
 
-    const interval = setInterval(() => {
-      checkMealWindow();
+    // 🔥 Ticking Timer: Proti 1 second e update hobe
+    const tickTimer = setInterval(() => {
+      updateWindowStatus();
+    }, 1000);
+
+    // Auto-lock checker: Proti 1 minute e check korbe
+    const autoLockTimer = setInterval(() => {
       checkAndAutoLock();
     }, 60000);
-    return () => clearInterval(interval);
+
+    return () => {
+      clearInterval(tickTimer);
+      clearInterval(autoLockTimer);
+    };
   }, []);
 
-  const checkMealWindow = () => {
+  const updateWindowStatus = () => {
     const now = new Date();
     const istTime = new Date(
       now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
     );
     const hour = istTime.getHours();
     const minute = istTime.getMinutes();
+    const second = istTime.getSeconds();
+
     const timeInMinutes = hour * 60 + minute;
+    const currentSec = hour * 3600 + minute * 60 + second;
 
     let type = "Lunch";
     let isLocked = false;
-    let closeText = "6:30 AM";
+    let countdownStr = "";
 
-    const LUNCH_CLOSE_TIME = 6 * 60 + 30;
-    const DINNER_OPEN_TIME = 11 * 60;
-    const DINNER_CLOSE_TIME = 18 * 60;
-    const LUNCH_OPEN_TIME = 22 * 60;
+    const LUNCH_CLOSE_TIME = 6 * 60 + 30; // 6:30 AM
+    const DINNER_OPEN_TIME = 11 * 60; // 11:00 AM
+    const DINNER_CLOSE_TIME = 18 * 60; // 6:00 PM
+    const LUNCH_OPEN_TIME = 22 * 60; // 10:00 PM
+
+    const LUNCH_CLOSE_SEC = 6 * 3600 + 30 * 60;
+    const DINNER_CLOSE_SEC = 18 * 3600;
 
     if (timeInMinutes >= LUNCH_OPEN_TIME || timeInMinutes < LUNCH_CLOSE_TIME) {
       type = "Lunch";
       isLocked = false;
-      closeText = "6:30 AM";
+
+      // Countdown Logic for Lunch
+      let diffSec = 0;
+      if (timeInMinutes >= LUNCH_OPEN_TIME) {
+        diffSec = 24 * 3600 - currentSec + LUNCH_CLOSE_SEC; // Next day
+      } else {
+        diffSec = LUNCH_CLOSE_SEC - currentSec; // Same day
+      }
+      const h = Math.floor(diffSec / 3600);
+      const m = Math.floor((diffSec % 3600) / 60);
+      const s = diffSec % 60;
+      countdownStr = `${h}h ${m}m ${s}s`;
     } else if (
       timeInMinutes >= LUNCH_CLOSE_TIME &&
       timeInMinutes < DINNER_OPEN_TIME
     ) {
       type = "Lunch";
       isLocked = true;
-      closeText = "6:30 AM";
     } else if (
       timeInMinutes >= DINNER_OPEN_TIME &&
       timeInMinutes < DINNER_CLOSE_TIME
     ) {
       type = "Dinner";
       isLocked = false;
-      closeText = "6:00 PM";
+
+      // Countdown Logic for Dinner
+      const diffSec = DINNER_CLOSE_SEC - currentSec;
+      const h = Math.floor(diffSec / 3600);
+      const m = Math.floor((diffSec % 3600) / 60);
+      const s = diffSec % 60;
+      countdownStr = `${h}h ${m}m ${s}s`;
     } else if (
       timeInMinutes >= DINNER_CLOSE_TIME &&
       timeInMinutes < LUNCH_OPEN_TIME
     ) {
       type = "Dinner";
       isLocked = true;
-      closeText = "6:00 PM";
     }
 
-    setMealWindow({ type, isLocked, closeText });
+    setMealWindow({ type, isLocked, countdown: countdownStr });
   };
 
   const checkAndAutoLock = async () => {
@@ -300,6 +331,7 @@ export default function MealControl({
         </h3>
 
         <div className="mb-8 relative z-10 flex flex-col items-center">
+          {/* 🔥 LIVE COUNTDOWN BADGE WITH CUSTOM CLOSED MESSAGE */}
           <div
             className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6 transition-colors ${
               mealWindow.isLocked
@@ -308,13 +340,23 @@ export default function MealControl({
             }`}
           >
             <i
-              className={`fas ${mealWindow.isLocked ? "fa-lock" : "fa-clock"}`}
+              className={`fas ${mealWindow.isLocked ? "fa-lock" : "fa-clock animate-pulse text-emerald-500"}`}
             ></i>
-            {mealWindow.isLocked
-              ? mealWindow.type === "Lunch"
-                ? "Lunch window is Closed ! Next Dinner window start from 11 AM / 11:00"
-                : "Dinner window is Closed ! Next Lunch window start from 10 PM / 22:00"
-              : `${mealWindow.type} window closes at ${mealWindow.closeText}`}
+
+            {mealWindow.isLocked ? (
+              mealWindow.type === "Lunch" ? (
+                "Lunch window is Closed ! Next Dinner window start from 11 AM"
+              ) : (
+                "Dinner window is Closed ! Next Lunch window start from 10 PM"
+              )
+            ) : (
+              <span>
+                {mealWindow.type} window closes in{" "}
+                <span className="font-black tracking-wide bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded ml-1">
+                  {mealWindow.countdown}
+                </span>
+              </span>
+            )}
           </div>
 
           <button
@@ -343,7 +385,7 @@ export default function MealControl({
           </button>
         </div>
         <p className="font-bold text-slate-600 dark:text-slate-400">
-          Regular Meal for Next {mealWindow.type}
+          Regular Meal for {mealWindow.type}
         </p>
       </div>
 
@@ -360,7 +402,6 @@ export default function MealControl({
           </h3>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* 🔥 NEW HISTORY BUTTON FOR ALL BOARDERS */}
             {onOpenGuestHistory && (
               <button
                 onClick={onOpenGuestHistory}

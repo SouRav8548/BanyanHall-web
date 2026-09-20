@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 export default function KitchenReport({ mealStats, loadingList }) {
   if (loadingList) {
@@ -13,15 +13,14 @@ export default function KitchenReport({ mealStats, loadingList }) {
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col h-full min-h-[320px]">
-      
       {/* Header Area */}
       <div className="p-4 md:p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/50">
         <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white flex items-center gap-3">
           <i className="fas fa-receipt text-amber-500"></i>
           Daily Kitchen Report
         </h2>
-        <button 
-          onClick={() => window.print()} 
+        <button
+          onClick={() => window.print()}
           className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-500 transition-colors shadow-sm print:hidden"
           title="Print Kitchen Report"
         >
@@ -30,10 +29,8 @@ export default function KitchenReport({ mealStats, loadingList }) {
       </div>
 
       <div className="p-3 md:p-6 flex-1 flex flex-col justify-center">
-        
         {/* 🔥 Shrinking Card Wrapper: flex-1 min-w-0 for dynamic fit without scroll */}
         <div className="flex flex-row justify-between gap-2 md:gap-4 w-full h-full items-center">
-          
           {/* Card 1: Total Meals */}
           <div className="flex-1 min-w-0 h-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-xl md:rounded-2xl p-2 md:p-5 flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02]">
             <i className="fas fa-users text-indigo-500 text-sm md:text-2xl mb-1 md:mb-3"></i>
@@ -55,7 +52,7 @@ export default function KitchenReport({ mealStats, loadingList }) {
               Egg (Non-Veg)
             </span>
             <div className="mt-2 w-full pt-2 border-t border-amber-200 dark:border-amber-500/20">
-              <span className="text-[7px] md:text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase truncate w-full block">
+              <span className="text-[14px] md:text-[15px] font-black text-slate-500 dark:text-slate-400 uppercase truncate w-full block">
                 Veg: {mealStats.eggVeg}
               </span>
             </div>
@@ -71,7 +68,7 @@ export default function KitchenReport({ mealStats, loadingList }) {
               Fish (Non-Veg)
             </span>
             <div className="mt-2 w-full pt-2 border-t border-blue-200 dark:border-blue-500/20">
-              <span className="text-[7px] md:text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase truncate w-full block">
+              <span className="text-[14px] md:text-[15px] font-black text-slate-500 dark:text-slate-400 uppercase truncate w-full block">
                 Veg: {mealStats.fishVeg}
               </span>
             </div>
@@ -87,12 +84,11 @@ export default function KitchenReport({ mealStats, loadingList }) {
               Chicken (Non)
             </span>
             <div className="mt-2 w-full pt-2 border-t border-rose-200 dark:border-rose-500/20">
-              <span className="text-[7px] md:text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase truncate w-full block">
+              <span className="text-[14px] md:text-[15px] font-black text-slate-500 dark:text-slate-400 uppercase truncate w-full block">
                 Veg: {mealStats.chickenVeg}
               </span>
             </div>
           </div>
-
         </div>
       </div>
     </div>

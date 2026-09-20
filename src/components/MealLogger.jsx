@@ -2,9 +2,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
 
 export default function MealLogger({ isManager }) {
-  const todayStr = new Date().toISOString().split("T")[0];
-  const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [session, setSession] = useState("Morning");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [session, setSession] = useState("");
 
   const [activeCount, setActiveCount] = useState(0);
   const [usersToLog, setUsersToLog] = useState([]);
@@ -12,45 +11,57 @@ export default function MealLogger({ isManager }) {
   const [isAlreadyLogged, setIsAlreadyLogged] = useState(false);
   const [loggedMenu, setLoggedMenu] = useState("");
 
-  const [canSaveSession, setCanSaveSession] = useState(false);
-  const [timeMessage, setTimeMessage] = useState("");
   const [menuName, setMenuName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // 🔥 Smart IST Auto-Detector for Session & Date
   useEffect(() => {
-    checkData();
+    const calculateISTWindow = () => {
+      const now = new Date();
+      const istTime = new Date(
+        now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+      );
+      const hours = istTime.getHours();
+      const minutes = istTime.getMinutes();
+      const timeInMinutes = hours * 60 + minutes;
+
+      let targetSession = "Morning";
+      let targetDate = new Date(istTime);
+
+      if (timeInMinutes >= 390 && timeInMinutes < 1080) {
+        // 6:30 AM to 5:59 PM -> Time to lock Today's Lunch
+        targetSession = "Morning";
+      } else if (timeInMinutes >= 1080) {
+        // 6:00 PM to 11:59 PM -> Time to lock Today's Dinner
+        targetSession = "Dinner";
+      } else {
+        // 12:00 AM to 6:29 AM -> Time to lock Yesterday's Dinner
+        targetSession = "Dinner";
+        targetDate.setDate(targetDate.getDate() - 1);
+      }
+
+      // Local IST formatting
+      const year = targetDate.getFullYear();
+      const month = String(targetDate.getMonth() + 1).padStart(2, "0");
+      const day = String(targetDate.getDate()).padStart(2, "0");
+      const dateString = `${year}-${month}-${day}`;
+
+      if (selectedDate !== dateString || session !== targetSession) {
+        setSelectedDate(dateString);
+        setSession(targetSession);
+      }
+    };
+
+    calculateISTWindow();
+    const interval = setInterval(calculateISTWindow, 60000); // 1 minute ontor check korbe
+    return () => clearInterval(interval);
   }, [selectedDate, session]);
 
   useEffect(() => {
-    const checkTime = () => {
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      if (session === "Morning") {
-        if ((hours > 6 || (hours === 6 && minutes >= 30)) && hours < 20) {
-          setCanSaveSession(true);
-          setTimeMessage("");
-        } else if (hours >= 20) {
-          setCanSaveSession(false);
-          setTimeMessage("Too Late!");
-        } else {
-          setCanSaveSession(false);
-          setTimeMessage("Morning window is OPEN. Lock after 6:30 AM.");
-        }
-      } else {
-        if (hours >= 18) {
-          setCanSaveSession(true);
-          setTimeMessage("");
-        } else {
-          setCanSaveSession(false);
-          setTimeMessage("Dinner window is OPEN. Lock after 6:00 PM.");
-        }
-      }
-    };
-    checkTime();
-    const interval = setInterval(checkTime, 60000);
-    return () => clearInterval(interval);
-  }, [session, selectedDate]);
+    if (selectedDate && session) {
+      checkData();
+    }
+  }, [selectedDate, session]);
 
   const checkData = async () => {
     setLoading(true);
@@ -68,37 +79,32 @@ export default function MealLogger({ isManager }) {
     } else {
       setIsAlreadyLogged(false);
       setLoggedMenu("");
-      if (selectedDate === todayStr) {
-        // 🔥 Update: Fetch full_name, room_no, mobile_number for history table
-        const { data } = await supabase
-          .from("profiles")
-          .select(
-            "id, full_name, room_no, mobile_number, meal_status, guest_veg_count, guest_egg_count, guest_fish_count, guest_chicken_count, roles(role_name)",
-          )
-          .eq("is_approved", true)
-          .or(
-            "meal_status.eq.true,guest_veg_count.gt.0,guest_egg_count.gt.0,guest_fish_count.gt.0,guest_chicken_count.gt.0",
-          );
 
-        if (data) {
-          const validUsers = data.filter(
-            (d) => d.roles?.role_name !== "Superintendent",
-          );
-          let totalMeals = 0;
-          validUsers.forEach((u) => {
-            if (u.meal_status) totalMeals++;
-            totalMeals +=
-              (u.guest_veg_count || 0) +
-              (u.guest_egg_count || 0) +
-              (u.guest_fish_count || 0) +
-              (u.guest_chicken_count || 0);
-          });
-          setActiveCount(totalMeals);
-          setUsersToLog(validUsers);
-        }
-      } else {
-        setActiveCount(0);
-        setUsersToLog([]);
+      const { data } = await supabase
+        .from("profiles")
+        .select(
+          "id, full_name, room_no, mobile_number, meal_status, guest_veg_count, guest_egg_count, guest_fish_count, guest_chicken_count, roles(role_name)",
+        )
+        .eq("is_approved", true)
+        .or(
+          "meal_status.eq.true,guest_veg_count.gt.0,guest_egg_count.gt.0,guest_fish_count.gt.0,guest_chicken_count.gt.0",
+        );
+
+      if (data) {
+        const validUsers = data.filter(
+          (d) => d.roles?.role_name !== "Superintendent",
+        );
+        let totalMeals = 0;
+        validUsers.forEach((u) => {
+          if (u.meal_status) totalMeals++;
+          totalMeals +=
+            (u.guest_veg_count || 0) +
+            (u.guest_egg_count || 0) +
+            (u.guest_fish_count || 0) +
+            (u.guest_chicken_count || 0);
+        });
+        setActiveCount(totalMeals);
+        setUsersToLog(validUsers);
       }
     }
     setLoading(false);
@@ -112,14 +118,14 @@ export default function MealLogger({ isManager }) {
       : baseMenu;
     if (
       !window.confirm(
-        `Are you sure you want to lock and save ${activeCount} meals (including guests) for ${session}?`,
+        `Are you sure you want to lock and save ${activeCount} meals (including guests) for ${session === "Morning" ? "Lunch" : "Dinner"}?`,
       )
     )
       return;
 
     setIsSaving(true);
     const logsToInsert = [];
-    const guestHistoryToInsert = []; // 🔥 Notun Array Guest History er jonno
+    const guestHistoryToInsert = [];
     const guestIdsToReset = [];
 
     usersToLog.forEach((u) => {
@@ -179,7 +185,6 @@ export default function MealLogger({ isManager }) {
 
         guestIdsToReset.push(u.id);
 
-        // 🔥 Guest History record banano hocche
         guestHistoryToInsert.push({
           boarder_id: u.id,
           full_name: u.full_name || "Unknown",
@@ -196,11 +201,9 @@ export default function MealLogger({ isManager }) {
 
     const { error } = await supabase.from("meal_logs").insert(logsToInsert);
     if (!error) {
-      // 🔥 History Table e insert kora
       if (guestHistoryToInsert.length > 0) {
         await supabase.from("guest_meal_logs").insert(guestHistoryToInsert);
       }
-      // 🔥 Profile e guest count reset kora
       if (guestIdsToReset.length > 0) {
         await supabase
           .from("profiles")
@@ -222,8 +225,6 @@ export default function MealLogger({ isManager }) {
     setIsSaving(false);
   };
 
-  const isToday = selectedDate === todayStr;
-
   return (
     <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 mb-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -232,19 +233,22 @@ export default function MealLogger({ isManager }) {
             <i className="fas fa-clipboard-check text-emerald-500"></i> Daily
             Meal Logger
           </h2>
+          <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-wider">
+            Date & Session Auto-Synchronized (IST)
+          </p>
         </div>
         <div className="flex gap-3">
+          {/* Inputs are now disabled so managers can't change them manually */}
           <input
             type="date"
+            disabled
             value={selectedDate}
-            max={todayStr}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-bold outline-none"
+            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-sm font-bold outline-none opacity-80 cursor-not-allowed"
           />
           <select
+            disabled
             value={session}
-            onChange={(e) => setSession(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-bold outline-none cursor-pointer"
+            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-sm font-bold outline-none opacity-80 cursor-not-allowed"
           >
             <option value="Morning">Lunch</option>
             <option value="Dinner">Dinner</option>
@@ -257,6 +261,7 @@ export default function MealLogger({ isManager }) {
           </button>
         </div>
       </div>
+
       {loading ? (
         <div className="flex justify-center py-4">
           <i className="fas fa-spinner fa-spin text-2xl text-emerald-500"></i>
@@ -272,19 +277,6 @@ export default function MealLogger({ isManager }) {
               Menu: {loggedMenu}
             </p>
           </div>
-        </div>
-      ) : !isToday ? (
-        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl text-center border border-slate-200 dark:border-slate-700">
-          <p className="text-sm font-bold text-slate-500">
-            No records saved for this date.
-          </p>
-        </div>
-      ) : !canSaveSession ? (
-        <div className="bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 p-4 rounded-xl flex items-center gap-3">
-          <i className="fas fa-clock text-sky-500 animate-pulse text-xl"></i>
-          <p className="text-sm font-bold text-sky-700 dark:text-sky-400">
-            {timeMessage}
-          </p>
         </div>
       ) : (
         <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-700 p-4 rounded-xl">
