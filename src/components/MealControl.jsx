@@ -311,7 +311,9 @@ export default function MealControl({
               className={`fas ${mealWindow.isLocked ? "fa-lock" : "fa-clock"}`}
             ></i>
             {mealWindow.isLocked
-              ? `${mealWindow.type} window is CLOSED`
+              ? mealWindow.type === "Lunch"
+                ? "Lunch window is Closed ! Next Dinner window start from 11 AM / 11:00"
+                : "Dinner window is Closed ! Next Lunch window start from 10 PM / 22:00"
               : `${mealWindow.type} window closes at ${mealWindow.closeText}`}
           </div>
 
@@ -341,7 +343,7 @@ export default function MealControl({
           </button>
         </div>
         <p className="font-bold text-slate-600 dark:text-slate-400">
-          Regular Meal for {mealWindow.type}
+          Regular Meal for Next {mealWindow.type}
         </p>
       </div>
 
