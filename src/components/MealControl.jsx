@@ -17,6 +17,13 @@ export default function MealControl({
     chicken: "",
   });
 
+  // 🔥 Smart Time Tracking State
+  const [mealWindow, setMealWindow] = useState({
+    type: "Lunch",
+    isLocked: false,
+    closeText: "6:30 AM",
+  });
+
   // Check if current user is Mess Prefect
   const isMessPrefect =
     roleName === "Prefect Committee" &&
@@ -24,7 +31,69 @@ export default function MealControl({
 
   useEffect(() => {
     fetchPrices();
+    checkMealWindow(); // Prothom bar component load hole check korbe
+
+    // Proti 1 minute (60000ms) por por time automatically update hobe
+    const interval = setInterval(checkMealWindow, 60000);
+    return () => clearInterval(interval);
   }, []);
+
+  const checkMealWindow = () => {
+    // 🕒 IST (Indian Standard Time) calculation
+    const now = new Date();
+    const istTime = new Date(
+      now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
+    );
+    const hour = istTime.getHours();
+    const minute = istTime.getMinutes();
+    const timeInMinutes = hour * 60 + minute;
+
+    let type = "Lunch";
+    let isLocked = false;
+    let closeText = "6:30 AM";
+
+    // 🕒 TIME LIMITS IN MINUTES
+    const LUNCH_CLOSE_TIME = 6 * 60 + 30; // 6:30 AM
+    const DINNER_OPEN_TIME = 11 * 60; // 11:00 AM
+    const DINNER_CLOSE_TIME = 18 * 60; // 6:00 PM
+    const LUNCH_OPEN_TIME = 22 * 60; // 10:00 PM
+
+    // Rule 1: Rat 10:00 theke Sokal 6:30 (Lunch Open)
+    if (timeInMinutes >= LUNCH_OPEN_TIME || timeInMinutes < LUNCH_CLOSE_TIME) {
+      type = "Lunch";
+      isLocked = false;
+      closeText = "6:30 AM";
+    }
+    // Rule 2: Sokal 6:30 theke Sokal 11:00 (Lunch Closed / Locked)
+    else if (
+      timeInMinutes >= LUNCH_CLOSE_TIME &&
+      timeInMinutes < DINNER_OPEN_TIME
+    ) {
+      type = "Lunch";
+      isLocked = true;
+      closeText = "6:30 AM";
+    }
+    // Rule 3: Sokal 11:00 theke Sandhya 6:00 (Dinner Open)
+    else if (
+      timeInMinutes >= DINNER_OPEN_TIME &&
+      timeInMinutes < DINNER_CLOSE_TIME
+    ) {
+      type = "Dinner";
+      isLocked = false;
+      closeText = "6:00 PM";
+    }
+    // Rule 4: Sandhya 6:00 theke Rat 10:00 (Dinner Closed / Locked)
+    else if (
+      timeInMinutes >= DINNER_CLOSE_TIME &&
+      timeInMinutes < LUNCH_OPEN_TIME
+    ) {
+      type = "Dinner";
+      isLocked = true;
+      closeText = "6:00 PM";
+    }
+
+    setMealWindow({ type, isLocked, closeText });
+  };
 
   const fetchPrices = async () => {
     const { data, error } = await supabase
@@ -49,7 +118,7 @@ export default function MealControl({
   };
 
   const updateGuestCount = async (type, increment) => {
-    if (!profile || updatingGuest) return;
+    if (!profile || updatingGuest || mealWindow.isLocked) return;
 
     const column = `guest_${type}_count`;
     const currentCount = profile[column] || 0;
@@ -109,19 +178,28 @@ export default function MealControl({
 
         <div className="mb-8 relative z-10 flex flex-col items-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold mb-6">
-            <i className="fas fa-lock"></i> Lunch window closes at 6:30 AM
+            <i className="fas fa-lock"></i> {mealWindow.type} window closes at{" "}
+            {mealWindow.closeText}
           </div>
 
           <button
             onClick={toggleMealStatus}
-            disabled={isMealUpdating}
-            className={`relative w-40 h-40 rounded-full flex flex-col items-center justify-center text-white transition-all duration-300 shadow-xl ${profile?.meal_status ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30" : "bg-rose-500 hover:bg-rose-600 shadow-rose-500/30"} disabled:opacity-75 disabled:scale-95 hover:scale-105`}
+            disabled={isMealUpdating || mealWindow.isLocked}
+            className={`relative w-40 h-40 rounded-full flex flex-col items-center justify-center text-white transition-all duration-300 shadow-xl ${
+              mealWindow.isLocked
+                ? "bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-500 shadow-none cursor-not-allowed border-4 border-slate-200 dark:border-slate-700"
+                : profile?.meal_status
+                  ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30"
+                  : "bg-rose-500 hover:bg-rose-600 shadow-rose-500/30"
+            } disabled:opacity-75 disabled:scale-95 hover:scale-105`}
           >
             {isMealUpdating ? (
               <i className="fas fa-circle-notch fa-spin text-4xl"></i>
             ) : (
               <>
-                <i className="fas fa-utensils text-4xl mb-2"></i>
+                <i
+                  className={`fas ${mealWindow.isLocked ? "fa-lock text-3xl mb-2 opacity-50" : "fa-utensils text-4xl mb-2"}`}
+                ></i>
                 <span className="text-2xl font-black">
                   {profile?.meal_status ? "ON" : "OFF"}
                 </span>
@@ -130,15 +208,20 @@ export default function MealControl({
           </button>
         </div>
         <p className="font-bold text-slate-600 dark:text-slate-400">
-          Regular Meal for Lunch
+          Regular Meal for {mealWindow.type}
         </p>
       </div>
 
       {/* Guest Meal Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 relative">
+      <div
+        className={`bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border relative transition-all ${mealWindow.isLocked ? "border-rose-200 dark:border-rose-900/50 opacity-80" : "border-slate-200 dark:border-slate-800"}`}
+      >
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
-            <i className="fas fa-user-plus text-indigo-500"></i> Add Guest Meals
+            <i
+              className={`fas ${mealWindow.isLocked ? "fa-lock text-rose-500" : "fa-user-plus text-indigo-500"}`}
+            ></i>{" "}
+            Add Guest Meals
           </h3>
           <div className="flex items-center gap-3">
             {isMessPrefect && (
@@ -179,8 +262,12 @@ export default function MealControl({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => updateGuestCount("veg", false)}
-                disabled={updatingGuest || !profile?.guest_veg_count}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30"
+                disabled={
+                  updatingGuest ||
+                  !profile?.guest_veg_count ||
+                  mealWindow.isLocked
+                }
+                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
               >
                 <i className="fas fa-minus text-xs"></i>
               </button>
@@ -189,8 +276,8 @@ export default function MealControl({
               </span>
               <button
                 onClick={() => updateGuestCount("veg", true)}
-                disabled={updatingGuest}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30"
+                disabled={updatingGuest || mealWindow.isLocked}
+                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
               >
                 <i className="fas fa-plus text-xs"></i>
               </button>
@@ -215,8 +302,12 @@ export default function MealControl({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => updateGuestCount("egg", false)}
-                disabled={updatingGuest || !profile?.guest_egg_count}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30"
+                disabled={
+                  updatingGuest ||
+                  !profile?.guest_egg_count ||
+                  mealWindow.isLocked
+                }
+                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
               >
                 <i className="fas fa-minus text-xs"></i>
               </button>
@@ -225,8 +316,8 @@ export default function MealControl({
               </span>
               <button
                 onClick={() => updateGuestCount("egg", true)}
-                disabled={updatingGuest}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30"
+                disabled={updatingGuest || mealWindow.isLocked}
+                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
               >
                 <i className="fas fa-plus text-xs"></i>
               </button>
@@ -251,8 +342,12 @@ export default function MealControl({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => updateGuestCount("fish", false)}
-                disabled={updatingGuest || !profile?.guest_fish_count}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30"
+                disabled={
+                  updatingGuest ||
+                  !profile?.guest_fish_count ||
+                  mealWindow.isLocked
+                }
+                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
               >
                 <i className="fas fa-minus text-xs"></i>
               </button>
@@ -261,8 +356,8 @@ export default function MealControl({
               </span>
               <button
                 onClick={() => updateGuestCount("fish", true)}
-                disabled={updatingGuest}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30"
+                disabled={updatingGuest || mealWindow.isLocked}
+                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
               >
                 <i className="fas fa-plus text-xs"></i>
               </button>
@@ -287,8 +382,12 @@ export default function MealControl({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => updateGuestCount("chicken", false)}
-                disabled={updatingGuest || !profile?.guest_chicken_count}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30"
+                disabled={
+                  updatingGuest ||
+                  !profile?.guest_chicken_count ||
+                  mealWindow.isLocked
+                }
+                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
               >
                 <i className="fas fa-minus text-xs"></i>
               </button>
@@ -297,8 +396,8 @@ export default function MealControl({
               </span>
               <button
                 onClick={() => updateGuestCount("chicken", true)}
-                disabled={updatingGuest}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30"
+                disabled={updatingGuest || mealWindow.isLocked}
+                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
               >
                 <i className="fas fa-plus text-xs"></i>
               </button>
