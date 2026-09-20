@@ -154,8 +154,29 @@ export default function Home() {
 
       {/* Main Wrapper Content */}
       <div className="relative z-10 flex-1 flex flex-col">
-        <section className="pt-28 pb-12 md:pt-32 md:pb-16 lg:pt-40 lg:pb-24 flex flex-col justify-center">
+        <section className="pt-28 pb-12 md:pt-32 md:pb-16 lg:pt-10 lg:pb-24 flex flex-col justify-center">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            {/* --- BANYAN GLORY TEXT HIGHLIGHT ADDED HERE --- */}
+            <div className="flex flex-col items-center justify-center text-center mb-8 md:mb-10 animate-fade-in-up">
+              <p className="text-emerald-800 dark:text-emerald-300 font-serif font-bold tracking-[0.1em] text-sm md:text-base md:tracking-[0.2em] uppercase drop-shadow-sm mb-2">
+                Our Past{" "}
+                <span className="text-slate-800 dark:text-slate-200">!</span>{" "}
+                Our Present{" "}
+                <span className="text-slate-800 dark:text-slate-200">!</span>{" "}
+                Our Glory
+              </p>
+              <h1
+                className="text-6xl md:text-7xl lg:text-8xl font-medium tracking-wide text-emerald-600 dark:text-emerald-400 drop-shadow-[0_3px_10px_rgba(5,150,105,0.4)] dark:drop-shadow-[0_0px_20px_rgba(52,211,153,0.4)] transition-all duration-500"
+                style={{
+                  fontFamily:
+                    "'Brush Script MT', 'Great Vibes', 'Pacifico', cursive",
+                }}
+              >
+                Our Banyan
+              </h1>
+            </div>
+            {/* ---------------------------------------------- */}
+
             <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 backdrop-blur-md mb-6 md:mb-8 shadow-sm">
               <span className="flex h-1.5 w-1.5 md:h-2 md:w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 dark:bg-cyan-400 opacity-75"></span>

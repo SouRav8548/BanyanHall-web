@@ -16,7 +16,7 @@ import MealLogger from "./components/MealLogger";
 import PrefectCommittee from "./components/PrefectCommittee";
 import GuestMealLogModal from "./components/GuestMealLogModal";
 import EditProfileModal from "./components/EditProfileModal";
-import MyMealHistoryModal from "./components/MyMealHistoryModal"; // 🔥 Modal Import Kora Holo
+import MyMealHistoryModal from "./components/MyMealHistoryModal";
 import Footer from "./components/Footer";
 
 export default function Dashboard() {
@@ -39,7 +39,7 @@ export default function Dashboard() {
 
   const [showGuestLogModal, setShowGuestLogModal] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false); // 🔥 History Modal State
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // --- UI MODALS & TOAST STATES ---
   const [toast, setToast] = useState({
@@ -78,14 +78,13 @@ export default function Dashboard() {
     fetchNotice();
   }, [navigate]);
 
-  // 🔥 Fetch Notice with Limit to avoid heavy load
   const fetchNotice = async () => {
     try {
       const { data } = await supabase
         .from("notices")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(40); // Shudhu last 40 ta notice asbe tracking er jonno
+        .limit(40);
       if (data) setNotices(data);
     } catch (error) {
       console.error("Notice error:", error);
@@ -425,7 +424,6 @@ export default function Dashboard() {
   if (loading)
     return (
       <>
-        {/* Loading er somoy o modal ta jeno background e check kore */}
         <UpdatePasswordModal />
         <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
           <i className="fas fa-circle-notch fa-spin text-4xl text-emerald-500"></i>
@@ -461,7 +459,7 @@ export default function Dashboard() {
       <DashboardNavbar profile={profile} roleName={roleName} />
 
       <div className="flex-1 max-w-7xl mx-auto px-4 md:px-8 pt-24 pb-12 relative z-10 w-full">
-        {/* 🔥 Notice Board */}
+        {/* Notice Board */}
         <div className="mb-8 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
@@ -503,7 +501,6 @@ export default function Dashboard() {
                       >
                         {noticeItem.title}
                       </h4>
-                      {/* 🔥 Superintendent Badges */}
                       {isSuperintendent && isExpired && (
                         <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
                           Expired
@@ -549,7 +546,6 @@ export default function Dashboard() {
                 : "xl:col-span-3 flex flex-col gap-6"
             }
           >
-            {/* 🔥 Pass onViewHistory to ProfilePanel */}
             <ProfilePanel
               profile={profile}
               roleName={roleName}
@@ -568,7 +564,7 @@ export default function Dashboard() {
                 roleName={roleName}
                 isMealUpdating={isMealUpdating}
                 toggleMealStatus={toggleMealStatus}
-                onOpenGuestHistory={() => setIsGuestHistoryOpen(true)} // 🔥 Ei line ta add korun
+                onOpenGuestHistory={() => setShowGuestLogModal(true)} // 🔥 FIX 1: State name theek kora holo
               />
             </div>
           )}
@@ -611,16 +607,17 @@ export default function Dashboard() {
                   <h3 className="text-lg font-black text-amber-700 dark:text-amber-400 flex items-center gap-2">
                     <i className="fas fa-user-plus"></i> Live Guest Meals
                   </h3>
+
                   <div className="flex items-center gap-3">
-                    {(isMessPrefect || isSuperintendent) && (
-                      <button
-                        onClick={() => setShowGuestLogModal(true)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-200/50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/30 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-300/50 dark:border-amber-500/30 shadow-sm hover:scale-105"
-                        title="View Past 3 Months Log"
-                      >
-                        <i className="fas fa-history"></i> Log History
-                      </button>
-                    )}
+                    {/* 🔥 FIX 2: Restriction Soriye Dewa Holo, Ekhon Sobai Dekhbe */}
+                    <button
+                      onClick={() => setShowGuestLogModal(true)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-200/50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/30 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-300/50 dark:border-amber-500/30 shadow-sm hover:scale-105"
+                      title="View Past 3 Months Log"
+                    >
+                      <i className="fas fa-history"></i> Log History
+                    </button>
+
                     <span className="bg-amber-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-sm">
                       {activeGuests.length} Hosts
                     </span>
@@ -911,7 +908,6 @@ export default function Dashboard() {
         fetchProfile={fetchUserData}
       />
 
-      {/* 🔥 My Meal History Modal Add Kora Holo */}
       <MyMealHistoryModal
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
