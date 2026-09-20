@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabase";
 
+import UpdatePasswordModal from "./components/UpdatePasswordModal";
+
 import DashboardNavbar from "./components/DashboardNavbar";
 import ManagerBanner from "./components/ManagerBanner";
 import ProfilePanel from "./components/ProfilePanel";
-import UpdatePasswordModal from "./components/UpdatePasswordModal";
 import HostelSlideshow from "./components/HostelSlideshow";
 import MealControl from "./components/MealControl";
 import KitchenReport from "./components/KitchenReport";
@@ -423,9 +424,13 @@ export default function Dashboard() {
 
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <i className="fas fa-circle-notch fa-spin text-4xl text-emerald-500"></i>
-      </div>
+      <>
+        {/* Loading er somoy o modal ta jeno background e check kore */}
+        <UpdatePasswordModal />
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+          <i className="fas fa-circle-notch fa-spin text-4xl text-emerald-500"></i>
+        </div>
+      </>
     );
 
   const roleName = profile?.roles?.role_name || "Boarder";
