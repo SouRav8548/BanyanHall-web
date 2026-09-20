@@ -7,6 +7,7 @@ export default function ProfilePanel({
   isSuperintendent,
   fetchUserData,
   onEditClick,
+  onViewHistory, // 🔥 Ei prop ta add kora holo
 }) {
   const [email, setEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
@@ -163,7 +164,10 @@ export default function ProfilePanel({
       {/* Action Buttons: View History & Reset Password (Only for non-superintendent) */}
       {!isSuperintendent && (
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <button className="px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/20 transition-all flex items-center gap-2 shadow-sm">
+          <button
+            onClick={onViewHistory} // 🔥 Ekhane onClick event add kora holo
+            className="px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/20 transition-all flex items-center gap-2 shadow-sm"
+          >
             <i className="fas fa-history"></i> View My Meal History
           </button>
 

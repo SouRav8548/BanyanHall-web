@@ -14,6 +14,7 @@ import MealLogger from "./components/MealLogger";
 import PrefectCommittee from "./components/PrefectCommittee";
 import GuestMealLogModal from "./components/GuestMealLogModal";
 import EditProfileModal from "./components/EditProfileModal";
+import MyMealHistoryModal from "./components/MyMealHistoryModal"; // 🔥 Modal Import Kora Holo
 import Footer from "./components/Footer";
 
 export default function Dashboard() {
@@ -36,6 +37,7 @@ export default function Dashboard() {
 
   const [showGuestLogModal, setShowGuestLogModal] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false); // 🔥 History Modal State
 
   // --- UI MODALS & TOAST STATES ---
   const [toast, setToast] = useState({
@@ -541,12 +543,14 @@ export default function Dashboard() {
                 : "xl:col-span-3 flex flex-col gap-6"
             }
           >
+            {/* 🔥 Pass onViewHistory to ProfilePanel */}
             <ProfilePanel
               profile={profile}
               roleName={roleName}
               isSuperintendent={isSuperintendent}
               fetchUserData={fetchUserData}
               onEditClick={() => setShowEditProfile(true)}
+              onViewHistory={() => setShowHistoryModal(true)}
             />
             <HostelSlideshow />
           </div>
@@ -898,6 +902,15 @@ export default function Dashboard() {
         onClose={() => setShowEditProfile(false)}
         profile={profile}
         fetchProfile={fetchUserData}
+      />
+
+      {/* 🔥 My Meal History Modal Add Kora Holo */}
+      <MyMealHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        profileId={profile?.id}
+        roleName={roleName}
+        prefectTitle={profile?.prefect_title}
       />
 
       <Footer />
