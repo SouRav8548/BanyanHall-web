@@ -37,3 +37,8 @@ const images = [
 
 Step 5: Code "Inject" (Sync) Korun
 Ei command-ta apnar dist folder-er sob code (HTML, CSS, JS) Android project-er bhitor inject ba sync kore debe. Future-e apni web code-e kono change korle shudhu       npm run build       &      npx cap sync     korlei hobe.
+
+
+
+
+App Link: https://drive.google.com/file/d/1SufrLm0bKrTW1urXh3B8unfSkRFYAZkp/view?usp=sharing

@@ -62,7 +62,7 @@ export default function Footer() {
         {/* Download APK Link & Designer Note */}
         <div className="flex items-center gap-4">
           <a
-            href="https://drive.google.com/YOUR_GOOGLE_DRIVE_LINK_HERE"
+            href="https://drive.google.com/file/d/1SufrLm0bKrTW1urXh3B8unfSkRFYAZkp/view?usp=sharing"
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg border border-slate-700 transition-all text-xs font-bold shadow-sm"
