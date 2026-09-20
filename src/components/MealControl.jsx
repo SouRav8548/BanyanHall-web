@@ -177,9 +177,19 @@ export default function MealControl({
         </h3>
 
         <div className="mb-8 relative z-10 flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold mb-6">
-            <i className="fas fa-lock"></i> {mealWindow.type} window closes at{" "}
-            {mealWindow.closeText}
+          <div
+            className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6 transition-colors ${
+              mealWindow.isLocked
+                ? "bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20"
+                : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+            }`}
+          >
+            <i
+              className={`fas ${mealWindow.isLocked ? "fa-lock" : "fa-clock"}`}
+            ></i>
+            {mealWindow.isLocked
+              ? `${mealWindow.type} window is CLOSED`
+              : `${mealWindow.type} window closes at ${mealWindow.closeText}`}
           </div>
 
           <button
@@ -240,26 +250,34 @@ export default function MealControl({
         </div>
 
         <p className="text-xs font-bold text-slate-500 mb-4 -mt-4">
-          Adjust counts for guests (Auto-resets)
+          {mealWindow.isLocked ? (
+            <span className="text-rose-500">
+              <i className="fas fa-exclamation-triangle"></i> Guest additions
+              locked for {mealWindow.type}
+            </span>
+          ) : (
+            "Adjust counts for guests (Auto-resets)"
+          )}
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* 🔥 Responsive UI Grid for Guest Items */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Veg Guest */}
-          <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                <i className="fas fa-leaf text-xs"></i>
+          <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm gap-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                <i className="fas fa-leaf text-[10px] sm:text-xs"></i>
               </div>
-              <div className="flex flex-col">
-                <span className="font-black text-sm text-slate-800 dark:text-slate-200">
+              <div className="flex flex-col min-w-0">
+                <span className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200 truncate">
                   VEG
                 </span>
-                <span className="text-[10px] font-bold text-slate-400">
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
                   ₹{prices.veg}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => updateGuestCount("veg", false)}
                 disabled={
@@ -267,39 +285,39 @@ export default function MealControl({
                   !profile?.guest_veg_count ||
                   mealWindow.isLocked
                 }
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
               >
-                <i className="fas fa-minus text-xs"></i>
+                <i className="fas fa-minus text-[10px] sm:text-xs"></i>
               </button>
-              <span className="font-black w-4 text-center">
+              <span className="font-black w-3 sm:w-4 text-center text-xs sm:text-sm">
                 {profile?.guest_veg_count || 0}
               </span>
               <button
                 onClick={() => updateGuestCount("veg", true)}
                 disabled={updatingGuest || mealWindow.isLocked}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
               >
-                <i className="fas fa-plus text-xs"></i>
+                <i className="fas fa-plus text-[10px] sm:text-xs"></i>
               </button>
             </div>
           </div>
 
           {/* Egg Guest */}
-          <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-500 flex items-center justify-center">
-                <i className="fas fa-egg text-xs"></i>
+          <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm gap-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                <i className="fas fa-egg text-[10px] sm:text-xs"></i>
               </div>
-              <div className="flex flex-col">
-                <span className="font-black text-sm text-slate-800 dark:text-slate-200">
+              <div className="flex flex-col min-w-0">
+                <span className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200 truncate">
                   EGG
                 </span>
-                <span className="text-[10px] font-bold text-slate-400">
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
                   ₹{prices.egg}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => updateGuestCount("egg", false)}
                 disabled={
@@ -307,39 +325,39 @@ export default function MealControl({
                   !profile?.guest_egg_count ||
                   mealWindow.isLocked
                 }
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
               >
-                <i className="fas fa-minus text-xs"></i>
+                <i className="fas fa-minus text-[10px] sm:text-xs"></i>
               </button>
-              <span className="font-black w-4 text-center">
+              <span className="font-black w-3 sm:w-4 text-center text-xs sm:text-sm">
                 {profile?.guest_egg_count || 0}
               </span>
               <button
                 onClick={() => updateGuestCount("egg", true)}
                 disabled={updatingGuest || mealWindow.isLocked}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
               >
-                <i className="fas fa-plus text-xs"></i>
+                <i className="fas fa-plus text-[10px] sm:text-xs"></i>
               </button>
             </div>
           </div>
 
           {/* Fish Guest */}
-          <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                <i className="fas fa-fish text-xs"></i>
+          <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm gap-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                <i className="fas fa-fish text-[10px] sm:text-xs"></i>
               </div>
-              <div className="flex flex-col">
-                <span className="font-black text-sm text-slate-800 dark:text-slate-200">
+              <div className="flex flex-col min-w-0">
+                <span className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200 truncate">
                   FISH
                 </span>
-                <span className="text-[10px] font-bold text-slate-400">
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
                   ₹{prices.fish}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => updateGuestCount("fish", false)}
                 disabled={
@@ -347,39 +365,39 @@ export default function MealControl({
                   !profile?.guest_fish_count ||
                   mealWindow.isLocked
                 }
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
               >
-                <i className="fas fa-minus text-xs"></i>
+                <i className="fas fa-minus text-[10px] sm:text-xs"></i>
               </button>
-              <span className="font-black w-4 text-center">
+              <span className="font-black w-3 sm:w-4 text-center text-xs sm:text-sm">
                 {profile?.guest_fish_count || 0}
               </span>
               <button
                 onClick={() => updateGuestCount("fish", true)}
                 disabled={updatingGuest || mealWindow.isLocked}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
               >
-                <i className="fas fa-plus text-xs"></i>
+                <i className="fas fa-plus text-[10px] sm:text-xs"></i>
               </button>
             </div>
           </div>
 
           {/* Chicken Guest */}
-          <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-500 flex items-center justify-center">
-                <i className="fas fa-drumstick-bite text-xs"></i>
+          <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm gap-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                <i className="fas fa-drumstick-bite text-[10px] sm:text-xs"></i>
               </div>
-              <div className="flex flex-col">
-                <span className="font-black text-sm text-slate-800 dark:text-slate-200">
+              <div className="flex flex-col min-w-0">
+                <span className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200 truncate">
                   CHICKEN
                 </span>
-                <span className="text-[10px] font-bold text-slate-400">
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
                   ₹{prices.chicken}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => updateGuestCount("chicken", false)}
                 disabled={
@@ -387,19 +405,19 @@ export default function MealControl({
                   !profile?.guest_chicken_count ||
                   mealWindow.isLocked
                 }
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
               >
-                <i className="fas fa-minus text-xs"></i>
+                <i className="fas fa-minus text-[10px] sm:text-xs"></i>
               </button>
-              <span className="font-black w-4 text-center">
+              <span className="font-black w-3 sm:w-4 text-center text-xs sm:text-sm">
                 {profile?.guest_chicken_count || 0}
               </span>
               <button
                 onClick={() => updateGuestCount("chicken", true)}
                 disabled={updatingGuest || mealWindow.isLocked}
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
               >
-                <i className="fas fa-plus text-xs"></i>
+                <i className="fas fa-plus text-[10px] sm:text-xs"></i>
               </button>
             </div>
           </div>
