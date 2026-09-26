@@ -1,56 +1,94 @@
+import React from "react";
+
 export default function ManagerBanner({ managersInfo, cashierInfo }) {
-  // Jodi Manager abong Cashier keui na thake tahole kichu dekhabe na
   if ((!managersInfo || managersInfo.length === 0) && !cashierInfo) return null;
 
   return (
-    <div className="mb-8">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 px-2">
-        Current Month Officials
+    <div className="mb-6 animate-fade-in-up">
+      <h3 className="text-[10px] sm:text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <i className="fas fa-user-tie"></i> Current Month Officials
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        
-        {/* Manager Cards */}
-        {managersInfo && managersInfo.map((manager, index) => (
-          <div key={`manager-${index}`} className="bg-gradient-to-r from-amber-500 to-orange-500 dark:from-indigo-600 dark:to-blue-600 rounded-2xl p-4 text-white shadow-lg flex flex-col justify-between border border-amber-400/50 dark:border-indigo-400/30">
-            <div className="flex items-center gap-4 mb-2">
-              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <i className="fas fa-user-tie text-xl"></i>
-              </div>
-              <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-wider opacity-90 mb-0.5">Manager</h3>
-                <p className="text-lg font-black leading-tight truncate" title={manager.full_name}>
-                  {manager.full_name}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-bold bg-black/10 dark:bg-black/20 px-3 py-2 rounded-xl backdrop-blur-sm mt-2">
-              <p><i className="fas fa-door-closed mr-1.5 opacity-80"></i> Rm: {manager.room_no || 'N/A'}</p>
-              <p><i className="fas fa-phone mr-1.5 opacity-80"></i> {manager.mobile_number || 'N/A'}</p>
-            </div>
-          </div>
-        ))}
 
-        {/* Cashier Card (Strictly 1 person) */}
-        {cashierInfo && (
-          <div className="bg-gradient-to-r from-teal-500 to-emerald-600 dark:from-teal-600 dark:to-emerald-800 rounded-2xl p-4 text-white shadow-lg flex flex-col justify-between border border-teal-400/50 dark:border-teal-500/30">
-            <div className="flex items-center gap-4 mb-2">
-              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <i className="fas fa-money-bill-wave text-xl"></i>
+      <div className="flex flex-col gap-2.5">
+        {/* 🔥 MANAGER LINE CARDS */}
+        {managersInfo &&
+          managersInfo.map((manager, idx) => (
+            <div
+              key={idx}
+              className="flex items-center justify-between p-2.5 sm:px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-600 dark:to-orange-600 text-white shadow-sm hover:shadow-md transition-shadow"
+            >
+              {/* Left Side: Icon + Role + Name */}
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0 shadow-inner">
+                  <i className="fas fa-user-cog text-xs sm:text-sm drop-shadow-sm"></i>
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest opacity-90 leading-tight drop-shadow-sm">
+                    Manager
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold truncate leading-tight drop-shadow-sm">
+                    {manager.full_name}
+                  </span>
+                </div>
               </div>
-              <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-wider opacity-90 mb-0.5">Cashier</h3>
-                <p className="text-lg font-black leading-tight truncate" title={cashierInfo.full_name}>
-                  {cashierInfo.full_name}
-                </p>
+
+              {/* Right Side: Room & Phone */}
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <span className="flex items-center gap-1 bg-black/15 px-2 py-1.5 rounded-lg border border-white/10 text-[9px] sm:text-xs font-bold whitespace-nowrap">
+                  <i className="fas fa-door-closed opacity-80"></i>{" "}
+                  <span className="hidden sm:inline">Rm:</span>{" "}
+                  {manager.room_no || "N/A"}
+                </span>
+                <a
+                  href={`tel:${manager.mobile_number}`}
+                  className="flex items-center gap-1.5 hover:bg-black/25 transition-colors bg-black/15 px-2 py-1.5 rounded-lg border border-white/10 text-[9px] sm:text-xs font-bold whitespace-nowrap"
+                >
+                  <i className="fas fa-phone-alt opacity-80"></i>{" "}
+                  <span className="inline">
+                    {manager.mobile_number || "N/A"}
+                  </span>
+                </a>
               </div>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-bold bg-black/10 dark:bg-black/20 px-3 py-2 rounded-xl backdrop-blur-sm mt-2">
-              <p><i className="fas fa-door-closed mr-1.5 opacity-80"></i> Rm: {cashierInfo.room_no || 'N/A'}</p>
-              <p><i className="fas fa-phone mr-1.5 opacity-80"></i> {cashierInfo.mobile_number || 'N/A'}</p>
+          ))}
+
+        {/* 🔥 CASHIER LINE CARD */}
+        {cashierInfo && (
+          <div className="flex items-center justify-between p-2.5 sm:px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-700 text-white shadow-sm hover:shadow-md transition-shadow">
+            {/* Left Side: Icon + Role + Name */}
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0 shadow-inner">
+                <i className="fas fa-money-bill-wave text-xs sm:text-sm drop-shadow-sm"></i>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest opacity-90 leading-tight drop-shadow-sm">
+                  Cashier
+                </span>
+                <span className="text-xs sm:text-sm font-bold truncate leading-tight drop-shadow-sm">
+                  {cashierInfo.full_name}
+                </span>
+              </div>
+            </div>
+
+            {/* Right Side: Room & Phone */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <span className="flex items-center gap-1 bg-black/15 px-2 py-1.5 rounded-lg border border-white/10 text-[9px] sm:text-xs font-bold whitespace-nowrap">
+                <i className="fas fa-door-closed opacity-80"></i>{" "}
+                <span className="hidden sm:inline">Rm:</span>{" "}
+                {cashierInfo.room_no || "N/A"}
+              </span>
+              <a
+                href={`tel:${cashierInfo.mobile_number}`}
+                className="flex items-center gap-1.5 hover:bg-black/25 transition-colors bg-black/15 px-2 py-1.5 rounded-lg border border-white/10 text-[9px] sm:text-xs font-bold whitespace-nowrap"
+              >
+                <i className="fas fa-phone-alt opacity-80"></i>{" "}
+                <span className="inline">
+                  {cashierInfo.mobile_number || "N/A"}
+                </span>
+              </a>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

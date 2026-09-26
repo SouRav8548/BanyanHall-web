@@ -16,11 +16,16 @@ import MealLogger from "./components/MealLogger";
 import PrefectCommittee from "./components/PrefectCommittee";
 import GuestMealLogModal from "./components/GuestMealLogModal";
 import EditProfileModal from "./components/EditProfileModal";
+import NewAuditWidget from "./components/NewAuditWidget";
+import SupplierWidget from "./components/SupplierWidget";
 import MyMealHistoryModal from "./components/MyMealHistoryModal";
 import Footer from "./components/Footer";
+import UserDashboard from "./UserDashboard";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("home");
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,6 +45,9 @@ export default function Dashboard() {
   const [showGuestLogModal, setShowGuestLogModal] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Profile Panel Modal State
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // --- UI MODALS & TOAST STATES ---
   const [toast, setToast] = useState({
@@ -155,13 +163,14 @@ export default function Dashboard() {
     }
   };
 
+  // 🔥 UPDATED: Added guest_paneer_count to fetch and calculations
   const fetchManagerStats = async () => {
     try {
       setLoadingList(true);
       const { data } = await supabase
         .from("profiles")
         .select(
-          "id, full_name, room_no, mobile_number, food_egg, food_fish, food_chicken, meal_status, guest_veg_count, guest_egg_count, guest_fish_count, guest_chicken_count, roles(role_name)",
+          "id, full_name, room_no, mobile_number, food_egg, food_fish, food_chicken, meal_status, guest_veg_count, guest_paneer_count, guest_egg_count, guest_fish_count, guest_chicken_count, roles(role_name)",
         )
         .eq("is_approved", true);
 
@@ -190,12 +199,16 @@ export default function Dashboard() {
           }
           const guestTotal =
             (p.guest_veg_count || 0) +
+            (p.guest_paneer_count || 0) +
             (p.guest_egg_count || 0) +
             (p.guest_fish_count || 0) +
             (p.guest_chicken_count || 0);
+
           if (guestTotal > 0) {
             stats.totalMeal += guestTotal;
-            stats.eggVeg += p.guest_veg_count || 0;
+            // Treating Paneer as Veg meal in the overall Kitchen calculation
+            stats.eggVeg +=
+              (p.guest_veg_count || 0) + (p.guest_paneer_count || 0);
             stats.eggNon += p.guest_egg_count || 0;
             stats.fishNon += p.guest_fish_count || 0;
             stats.chickenNon += p.guest_chicken_count || 0;
@@ -234,20 +247,76 @@ export default function Dashboard() {
     setConfirmModal({
       isOpen: true,
       title: "Approve Boarder",
-      message: `Are you sure you want to approve ${name}?`,
+      message: `Are you sure you want to approve ${name}? (Any missed meal charges since their admission date will be auto-calculated).`,
       type: "info",
       onConfirm: async () => {
-        await supabase
-          .from("profiles")
-          .update({
-            is_approved: true,
-            approved_by: profile?.full_name || "Admin",
-            approved_at: new Date().toISOString(),
-          })
-          .eq("id", userId);
-        fetchSuperintendentList();
-        showToast(`${name} has been approved!`, "success");
-        setConfirmModal({ isOpen: false });
+        try {
+          const targetUser = boardersList.find((b) => b.id === userId);
+          let totalRetroactiveDue = 0;
+
+          const isFirstApproval = !targetUser?.approved_at;
+
+          if (
+            targetUser &&
+            targetUser?.roles?.role_name !== "Superintendent" &&
+            isFirstApproval
+          ) {
+            const joinDateStr =
+              targetUser.admission_date || targetUser.created_at;
+            const joinDate = joinDateStr ? new Date(joinDateStr) : new Date();
+            const userYear = joinDate.getFullYear();
+            const userMonth = joinDate.getMonth();
+
+            const { data: audits } = await supabase
+              .from("audit_history")
+              .select("*");
+
+            if (audits) {
+              audits.forEach((audit) => {
+                const auditDate = new Date(`${audit.month} 1, ${audit.year}`);
+                const auditYear = auditDate.getFullYear();
+                const auditMonth = auditDate.getMonth();
+
+                if (
+                  auditYear > userYear ||
+                  (auditYear === userYear && auditMonth >= userMonth)
+                ) {
+                  totalRetroactiveDue += Number(audit.fixed_charge) || 0;
+                }
+              });
+            }
+          }
+
+          const currentDue = Number(targetUser?.total_due) || 0;
+          const newDue = currentDue + totalRetroactiveDue;
+
+          await supabase
+            .from("profiles")
+            .update({
+              is_approved: true,
+              approved_by: profile?.full_name || "Admin",
+              approved_at: new Date().toISOString(),
+              total_due: newDue,
+            })
+            .eq("id", userId);
+
+          fetchSuperintendentList();
+
+          if (totalRetroactiveDue > 0) {
+            showToast(
+              `${name} approved! ₹${totalRetroactiveDue} auto-added for past audits.`,
+              "success",
+            );
+          } else {
+            showToast(`${name} has been approved!`, "success");
+          }
+
+          setConfirmModal({ isOpen: false });
+        } catch (error) {
+          console.error("Error approving:", error);
+          showToast("Error approving boarder.", "error");
+          setConfirmModal({ isOpen: false });
+        }
       },
     });
   };
@@ -447,7 +516,6 @@ export default function Dashboard() {
   const canViewMealList = true;
   const canLogMeals = isManager || isCashier || isMessPrefect;
 
-  // 🔥 24 Hours Validity Logic
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const displayedNotices = isSuperintendent
     ? notices
@@ -456,295 +524,330 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans transition-colors duration-500 relative overflow-hidden">
       <div className="fixed top-0 left-0 w-full h-96 bg-gradient-to-b from-emerald-500/10 to-transparent dark:from-cyan-500/5 pointer-events-none z-0"></div>
-      <DashboardNavbar profile={profile} roleName={roleName} />
+
+      <NewAuditWidget
+        isSuperintendent={isSuperintendent}
+        setActiveTab={setActiveTab}
+      />
+      <SupplierWidget profile={profile} />
+
+      <DashboardNavbar
+        profile={profile}
+        roleName={roleName}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        setShowProfileModal={setShowProfileModal}
+      />
 
       <div className="flex-1 max-w-7xl mx-auto px-4 md:px-8 pt-24 pb-12 relative z-10 w-full">
-        {/* Notice Board */}
-        <div className="mb-8 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
-              <i className="fas fa-bullhorn text-rose-500"></i> Notice Board
-            </h3>
+        {activeTab === "home" ? (
+          <>
+            <div className="mb-8 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
+                  <i className="fas fa-bullhorn text-rose-500"></i> Notice Board
+                </h3>
 
-            {(isSuperintendent || isPrefect) && (
-              <button
-                onClick={handleAddNotice}
-                className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-colors flex items-center gap-2"
-              >
-                <i className="fas fa-plus"></i> Add New Notice
-              </button>
-            )}
-          </div>
-
-          {displayedNotices.length === 0 ? (
-            <p className="text-slate-500 text-sm font-bold bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
-              No new notices currently available.
-            </p>
-          ) : (
-            <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-              {displayedNotices.map((noticeItem) => {
-                const isExpired =
-                  new Date(noticeItem.created_at) < twentyFourHoursAgo;
-
-                return (
-                  <div
-                    key={noticeItem.id}
-                    className={`p-4 rounded-xl border transition-all ${
-                      isExpired
-                        ? "bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 opacity-80"
-                        : "bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/30"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <h4
-                        className={`font-bold ${isExpired ? "text-slate-600 dark:text-slate-400" : "text-rose-700 dark:text-rose-400"}`}
-                      >
-                        {noticeItem.title}
-                      </h4>
-                      {isSuperintendent && isExpired && (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                          Expired
-                        </span>
-                      )}
-                      {isSuperintendent && !isExpired && (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-                          Live
-                        </span>
-                      )}
-                    </div>
-
-                    <p
-                      className={`text-sm font-medium ${isExpired ? "text-slate-500 dark:text-slate-400" : "text-slate-700 dark:text-slate-300"}`}
-                    >
-                      {noticeItem.message}
-                    </p>
-                    <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-2">
-                      <i className="far fa-clock"></i>
-                      {new Date(noticeItem.created_at).toLocaleString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                      })}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <ManagerBanner managersInfo={managersInfo} cashierInfo={cashierInfo} />
-
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-8 items-start">
-          <div
-            className={
-              isSuperintendent
-                ? "xl:col-span-5 flex flex-col gap-6"
-                : "xl:col-span-3 flex flex-col gap-6"
-            }
-          >
-            <ProfilePanel
-              profile={profile}
-              roleName={roleName}
-              isSuperintendent={isSuperintendent}
-              fetchUserData={fetchUserData}
-              onEditClick={() => setShowEditProfile(true)}
-              onViewHistory={() => setShowHistoryModal(true)}
-            />
-            <HostelSlideshow />
-          </div>
-
-          {!isSuperintendent && (
-            <div className="xl:col-span-2">
-              <MealControl
-                profile={profile}
-                roleName={roleName}
-                isMealUpdating={isMealUpdating}
-                toggleMealStatus={toggleMealStatus}
-                onOpenGuestHistory={() => setShowGuestLogModal(true)} // 🔥 FIX 1: State name theek kora holo
-              />
-            </div>
-          )}
-        </div>
-
-        {canSeeStats && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="lg:col-span-1 bg-emerald-500 dark:bg-slate-800 rounded-3xl shadow-lg border border-emerald-400 dark:border-slate-700 p-8 flex flex-col items-center justify-center text-center text-white h-full min-h-[320px]">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-100 dark:text-slate-400 mb-2">
-                Total Meal / Total Boarders
-              </h2>
-              <p className="text-4xl md:text-5xl font-black drop-shadow-md">
-                {mealStats ? mealStats.totalMeal : 0}{" "}
-                <span className="text-2xl md:text-3xl opacity-75">
-                  / {mealStats ? mealStats.totalBoarders : 0}
-                </span>
-              </p>
-              <div className="flex flex-col gap-3 justify-center z-10 mt-6 w-full">
-                <button
-                  onClick={fetchManagerStats}
-                  className="w-full py-2.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold transition-colors shadow-sm"
-                >
-                  <i className="fas fa-sync-alt mr-2"></i> Refresh Count
-                </button>
-                {canViewMealList && (
+                {(isSuperintendent || isPrefect) && (
                   <button
-                    onClick={() => setShowMealModal(true)}
-                    className="w-full py-2.5 bg-slate-900 text-white dark:bg-emerald-400 dark:text-slate-900 rounded-lg text-sm font-black transition-all hover:scale-105 shadow-md"
+                    onClick={handleAddNotice}
+                    className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-colors flex items-center gap-2"
                   >
-                    <i className="fas fa-list-ul mr-2"></i> View Detailed Meal
-                    List
+                    <i className="fas fa-plus"></i> Add New Notice
                   </button>
                 )}
               </div>
+
+              {displayedNotices.length === 0 ? (
+                <p className="text-slate-500 text-sm font-bold bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                  No new notices currently available.
+                </p>
+              ) : (
+                <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                  {displayedNotices.map((noticeItem) => {
+                    const isExpired =
+                      new Date(noticeItem.created_at) < twentyFourHoursAgo;
+
+                    return (
+                      <div
+                        key={noticeItem.id}
+                        className={`p-4 rounded-xl border transition-all ${
+                          isExpired
+                            ? "bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 opacity-80"
+                            : "bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/30"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <h4
+                            className={`font-bold ${isExpired ? "text-slate-600 dark:text-slate-400" : "text-rose-700 dark:text-rose-400"}`}
+                          >
+                            {noticeItem.title}
+                          </h4>
+                          {isSuperintendent && isExpired && (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                              Expired
+                            </span>
+                          )}
+                          {isSuperintendent && !isExpired && (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                              Live
+                            </span>
+                          )}
+                        </div>
+
+                        <p
+                          className={`text-sm font-medium ${isExpired ? "text-slate-500 dark:text-slate-400" : "text-slate-700 dark:text-slate-300"}`}
+                        >
+                          {noticeItem.message}
+                        </p>
+                        <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-2">
+                          <i className="far fa-clock"></i>
+                          {new Date(noticeItem.created_at).toLocaleString(
+                            "en-GB",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: true,
+                            },
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {canViewMealList && (
-              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col h-full min-h-[320px] max-h-[400px] overflow-hidden">
-                <div className="bg-amber-50 dark:bg-amber-900/20 px-6 py-5 border-b border-amber-100 dark:border-amber-900/50 flex justify-between items-center sticky top-0 z-10">
-                  <h3 className="text-lg font-black text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                    <i className="fas fa-user-plus"></i> Live Guest Meals
-                  </h3>
+            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-8 items-start">
+              {isSuperintendent ? (
+                <div className="xl:col-span-5 flex flex-col gap-6">
+                  <ProfilePanel
+                    profile={profile}
+                    roleName={roleName}
+                    isSuperintendent={isSuperintendent}
+                    fetchUserData={fetchUserData}
+                    onEditClick={() => setShowEditProfile(true)}
+                    onViewHistory={() => setShowHistoryModal(true)}
+                  />
+                  <HostelSlideshow />
+                </div>
+              ) : (
+                <>
+                  <div className="xl:col-span-3 flex flex-col gap-6">
+                    <HostelSlideshow />
+                    <ManagerBanner
+                      managersInfo={managersInfo}
+                      cashierInfo={cashierInfo}
+                    />
+                  </div>
 
-                  <div className="flex items-center gap-3">
-                    {/* 🔥 FIX 2: Restriction Soriye Dewa Holo, Ekhon Sobai Dekhbe */}
-                    <button
-                      onClick={() => setShowGuestLogModal(true)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-200/50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/30 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-300/50 dark:border-amber-500/30 shadow-sm hover:scale-105"
-                      title="View Past 3 Months Log"
-                    >
-                      <i className="fas fa-history"></i> Log History
-                    </button>
+                  <div className="xl:col-span-2 flex flex-col gap-6">
+                    <MealControl
+                      profile={profile}
+                      roleName={roleName}
+                      isMealUpdating={isMealUpdating}
+                      toggleMealStatus={toggleMealStatus}
+                      onOpenGuestHistory={() => setShowGuestLogModal(true)}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
 
-                    <span className="bg-amber-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-sm">
-                      {activeGuests.length} Hosts
+            {canSeeStats && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div className="lg:col-span-1 bg-emerald-500 dark:bg-slate-800 rounded-3xl shadow-lg border border-emerald-400 dark:border-slate-700 p-8 flex flex-col items-center justify-center text-center text-white h-full min-h-[320px]">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-100 dark:text-slate-400 mb-2">
+                    Total Meal / Total Boarders
+                  </h2>
+                  <p className="text-4xl md:text-5xl font-black drop-shadow-md">
+                    {mealStats ? mealStats.totalMeal : 0}{" "}
+                    <span className="text-2xl md:text-3xl opacity-75">
+                      / {mealStats ? mealStats.totalBoarders : 0}
                     </span>
+                  </p>
+                  <div className="flex flex-col gap-3 justify-center z-10 mt-6 w-full">
+                    <button
+                      onClick={fetchManagerStats}
+                      className="w-full py-2.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold transition-colors shadow-sm"
+                    >
+                      <i className="fas fa-sync-alt mr-2"></i> Refresh Count
+                    </button>
+                    {canViewMealList && (
+                      <button
+                        onClick={() => setShowMealModal(true)}
+                        className="w-full py-2.5 bg-slate-900 text-white dark:bg-emerald-400 dark:text-slate-900 rounded-lg text-sm font-black transition-all hover:scale-105 shadow-md"
+                      >
+                        <i className="fas fa-list-ul mr-2"></i> View Detailed
+                        Meal List
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="overflow-y-auto flex-1 custom-scrollbar">
-                  {activeGuests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full p-8 text-slate-400 min-h-[200px]">
-                      <i className="fas fa-user-friends text-5xl mb-4 opacity-30"></i>
-                      <p className="font-bold text-base">
-                        No active guest meals right now.
-                      </p>
+
+                {canViewMealList && (
+                  <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col h-full min-h-[320px] max-h-[400px] overflow-hidden">
+                    <div className="bg-amber-50 dark:bg-amber-900/20 px-6 py-5 border-b border-amber-100 dark:border-amber-900/50 flex justify-between items-center sticky top-0 z-10">
+                      <h3 className="text-lg font-black text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                        <i className="fas fa-user-plus"></i> Live Guest Meals
+                      </h3>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setShowGuestLogModal(true)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-200/50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/30 text-[10px] font-black uppercase tracking-wider transition-all border border-amber-300/50 dark:border-amber-500/30 shadow-sm hover:scale-105"
+                          title="View Past 3 Months Log"
+                        >
+                          <i className="fas fa-history"></i> Log History
+                        </button>
+
+                        <span className="bg-amber-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-sm">
+                          {activeGuests.length} Hosts
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <table className="w-full text-left border-collapse">
-                      <thead className="sticky top-0 bg-slate-50 dark:bg-slate-950/90 backdrop-blur-md shadow-sm z-10">
-                        <tr className="border-b border-slate-200 dark:border-slate-800">
-                          <th className="p-4 pl-6 font-bold text-xs text-slate-500 uppercase">
-                            Host Details
-                          </th>
-                          <th className="p-4 pr-6 font-bold text-xs text-slate-500 uppercase">
-                            Guest Preference
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {activeGuests.map((g, idx) => (
-                          <tr
-                            key={`guest-${idx}`}
-                            className="border-b border-slate-50 dark:border-slate-800/50"
-                          >
-                            <td className="p-4 pl-6">
-                              <div className="flex flex-col gap-1.5">
-                                <span className="font-bold text-slate-900 dark:text-white text-sm">
-                                  {g.full_name}
-                                </span>
-                                <span className="text-xs font-bold text-slate-500 flex flex-wrap items-center gap-3">
-                                  <span>
-                                    Room:{" "}
-                                    <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                      {g.room_no || "N/A"}
+                    <div className="overflow-y-auto flex-1 custom-scrollbar">
+                      {activeGuests.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full p-8 text-slate-400 min-h-[200px]">
+                          <i className="fas fa-user-friends text-5xl mb-4 opacity-30"></i>
+                          <p className="font-bold text-base">
+                            No active guest meals right now.
+                          </p>
+                        </div>
+                      ) : (
+                        <table className="w-full text-left border-collapse">
+                          <thead className="sticky top-0 bg-slate-50 dark:bg-slate-950/90 backdrop-blur-md shadow-sm z-10">
+                            <tr className="border-b border-slate-200 dark:border-slate-800">
+                              <th className="p-4 pl-6 font-bold text-xs text-slate-500 uppercase">
+                                Host Details
+                              </th>
+                              <th className="p-4 pr-6 font-bold text-xs text-slate-500 uppercase">
+                                Guest Preference
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activeGuests.map((g, idx) => (
+                              <tr
+                                key={`guest-${idx}`}
+                                className="border-b border-slate-50 dark:border-slate-800/50"
+                              >
+                                <td className="p-4 pl-6">
+                                  <div className="flex flex-col gap-1.5">
+                                    <span className="font-bold text-slate-900 dark:text-white text-sm">
+                                      {g.full_name}
                                     </span>
-                                  </span>
-                                  {g.mobile_number ? (
-                                    <a
-                                      href={`tel:${g.mobile_number}`}
-                                      className="text-indigo-500 dark:text-indigo-400 hover:underline"
-                                    >
-                                      <i className="fas fa-phone-alt opacity-70"></i>{" "}
-                                      {g.mobile_number}
-                                    </a>
-                                  ) : (
-                                    <span>No Phone</span>
-                                  )}
-                                </span>
-                                <span className="mt-0.5 inline-flex items-center text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-500/20 w-fit shadow-sm">
-                                  <i className="fas fa-users mr-1.5 opacity-70"></i>{" "}
-                                  Total Guest Meals:{" "}
-                                  {(g.guest_veg_count || 0) +
-                                    (g.guest_egg_count || 0) +
-                                    (g.guest_fish_count || 0) +
-                                    (g.guest_chicken_count || 0)}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="p-4 pr-6">
-                              <div className="flex flex-wrap gap-2 text-[10px] font-bold">
-                                {g.guest_veg_count > 0 && (
-                                  <span className="px-2 py-1 rounded border text-emerald-600 bg-emerald-50/50 border-emerald-200 dark:bg-transparent dark:border-emerald-500/20">
-                                    Veg: {g.guest_veg_count}
-                                  </span>
-                                )}
-                                {g.guest_egg_count > 0 && (
-                                  <span className="px-2 py-1 rounded border text-orange-600 bg-orange-50/50 border-orange-200 dark:bg-transparent dark:border-orange-500/20">
-                                    Egg: {g.guest_egg_count}
-                                  </span>
-                                )}
-                                {g.guest_fish_count > 0 && (
-                                  <span className="px-2 py-1 rounded border text-blue-600 bg-blue-50/50 border-blue-200 dark:bg-transparent dark:border-blue-500/20">
-                                    Fish: {g.guest_fish_count}
-                                  </span>
-                                )}
-                                {g.guest_chicken_count > 0 && (
-                                  <span className="px-2 py-1 rounded border text-rose-600 bg-rose-50/50 border-rose-200 dark:bg-transparent dark:border-rose-500/20">
-                                    Chicken: {g.guest_chicken_count}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
+                                    <span className="text-xs font-bold text-slate-500 flex flex-wrap items-center gap-3">
+                                      <span>
+                                        Room:{" "}
+                                        <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                          {g.room_no || "N/A"}
+                                        </span>
+                                      </span>
+                                      {g.mobile_number ? (
+                                        <a
+                                          href={`tel:${g.mobile_number}`}
+                                          className="text-indigo-500 dark:text-indigo-400 hover:underline"
+                                        >
+                                          <i className="fas fa-phone-alt opacity-70"></i>{" "}
+                                          {g.mobile_number}
+                                        </a>
+                                      ) : (
+                                        <span>No Phone</span>
+                                      )}
+                                    </span>
+
+                                    {/* 🔥 UPDATED TOTAL COUNT HERE */}
+                                    <span className="mt-0.5 inline-flex items-center text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-500/20 w-fit shadow-sm">
+                                      <i className="fas fa-users mr-1.5 opacity-70"></i>{" "}
+                                      Total Guest Meals:{" "}
+                                      {(g.guest_veg_count || 0) +
+                                        (g.guest_paneer_count || 0) +
+                                        (g.guest_egg_count || 0) +
+                                        (g.guest_fish_count || 0) +
+                                        (g.guest_chicken_count || 0)}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="p-4 pr-6">
+                                  <div className="flex flex-wrap gap-2 text-[10px] font-bold">
+                                    {g.guest_veg_count > 0 && (
+                                      <span className="px-2 py-1 rounded border text-emerald-600 bg-emerald-50/50 border-emerald-200 dark:bg-transparent dark:border-emerald-500/20">
+                                        Veg: {g.guest_veg_count}
+                                      </span>
+                                    )}
+                                    {/* 🔥 ADDED PANEER BADGE HERE */}
+                                    {g.guest_paneer_count > 0 && (
+                                      <span className="px-2 py-1 rounded border text-yellow-600 bg-yellow-50/50 border-yellow-200 dark:bg-transparent dark:border-yellow-500/20">
+                                        Paneer: {g.guest_paneer_count}
+                                      </span>
+                                    )}
+                                    {g.guest_egg_count > 0 && (
+                                      <span className="px-2 py-1 rounded border text-orange-600 bg-orange-50/50 border-orange-200 dark:bg-transparent dark:border-orange-500/20">
+                                        Egg: {g.guest_egg_count}
+                                      </span>
+                                    )}
+                                    {g.guest_fish_count > 0 && (
+                                      <span className="px-2 py-1 rounded border text-blue-600 bg-blue-50/50 border-blue-200 dark:bg-transparent dark:border-blue-500/20">
+                                        Fish: {g.guest_fish_count}
+                                      </span>
+                                    )}
+                                    {g.guest_chicken_count > 0 && (
+                                      <span className="px-2 py-1 rounded border text-rose-600 bg-rose-50/50 border-rose-200 dark:bg-transparent dark:border-rose-500/20">
+                                        Chicken: {g.guest_chicken_count}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {canSeeStats && (
-          <>
-            {canLogMeals && <MealLogger isManager={isManager} />}
-            <KitchenReport mealStats={mealStats} loadingList={loadingList} />
+            {canSeeStats && (
+              <>
+                {canLogMeals && <MealLogger isManager={isManager} />}
+                <KitchenReport
+                  mealStats={mealStats}
+                  loadingList={loadingList}
+                />
+              </>
+            )}
+
+            <div id="directory">
+              {(isSuperintendent || isPrefect) && (
+                <HostelDirectory
+                  boardersList={boardersList}
+                  loadingList={loadingList}
+                  isSuperintendent={isSuperintendent}
+                  isMessPrefect={isMessPrefect}
+                  canApproveNew={canApproveNew}
+                  canRejectNew={canRejectNew}
+                  canSuspendActive={canSuspendActive}
+                  onRefresh={fetchSuperintendentList}
+                  handleApprove={handleApprove}
+                  handleReject={handleReject}
+                  handleSuspend={handleSuspend}
+                  handleMakePrefect={handleMakePrefect}
+                  handleMakeBoarder={handleMakeBoarder}
+                  handleMakeManager={handleMakeManager}
+                  handleMakeCashier={handleMakeCashier}
+                />
+              )}
+            </div>
           </>
+        ) : (
+          <UserDashboard profile={profile} setActiveTab={setActiveTab} />
         )}
-        <div id="directory">
-          {(isSuperintendent || isPrefect) && (
-            <HostelDirectory
-              boardersList={boardersList}
-              loadingList={loadingList}
-              isSuperintendent={isSuperintendent}
-              isMessPrefect={isMessPrefect}
-              canApproveNew={canApproveNew}
-              canRejectNew={canRejectNew}
-              canSuspendActive={canSuspendActive}
-              onRefresh={fetchSuperintendentList}
-              handleApprove={handleApprove}
-              handleReject={handleReject}
-              handleSuspend={handleSuspend}
-              handleMakePrefect={handleMakePrefect}
-              handleMakeBoarder={handleMakeBoarder}
-              handleMakeManager={handleMakeManager}
-              handleMakeCashier={handleMakeCashier}
-            />
-          )}
-        </div>
 
         <GuestMealLogModal
           isOpen={showGuestLogModal}
@@ -805,23 +908,25 @@ export default function Dashboard() {
 
       {promptModal.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 w-full max-w-sm shadow-2xl relative border border-slate-200 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800 animate-fade-in-up">
             <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">
               {promptModal.title}
             </h2>
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">
               {promptModal.message}
             </p>
-            <input
-              type="text"
+
+            <textarea
+              rows="5"
               value={promptModal.inputValue}
               onChange={(e) =>
                 setPromptModal({ ...promptModal, inputValue: e.target.value })
               }
-              className="w-full px-4 py-3 mb-6 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-white font-medium"
-              placeholder="Type here..."
+              className="w-full px-4 py-3 mb-6 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-white font-medium resize-y min-h-[120px] custom-scrollbar"
+              placeholder="Type your notice here... (Press Enter for new line)"
               autoFocus
-            />
+            ></textarea>
+
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setPromptModal({ isOpen: false })}
@@ -833,7 +938,7 @@ export default function Dashboard() {
                 onClick={() => promptModal.onConfirm(promptModal.inputValue)}
                 className="px-5 py-2.5 rounded-xl font-bold text-white bg-indigo-500 hover:bg-indigo-600 shadow-md transition-colors"
               >
-                Save Note
+                Publish Notice
               </button>
             </div>
           </div>
@@ -901,7 +1006,36 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Edit Profile Modal */}
+      {/* PROFILE MODAL (For Non-Superintendents) */}
+      {!isSuperintendent && showProfileModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-2xl">
+            <button
+              onClick={() => setShowProfileModal(false)}
+              className="absolute -top-4 -right-4 md:-top-6 md:-right-6 z-10 bg-rose-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:bg-rose-600 hover:scale-110 transition-all border-2 border-white dark:border-slate-900"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+            <div className="shadow-2xl rounded-3xl overflow-hidden">
+              <ProfilePanel
+                profile={profile}
+                roleName={roleName}
+                isSuperintendent={isSuperintendent}
+                fetchUserData={fetchUserData}
+                onEditClick={() => {
+                  setShowProfileModal(false);
+                  setShowEditProfile(true);
+                }}
+                onViewHistory={() => {
+                  setShowProfileModal(false);
+                  setShowHistoryModal(true);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <EditProfileModal
         isOpen={showEditProfile}
         onClose={() => setShowEditProfile(false)}

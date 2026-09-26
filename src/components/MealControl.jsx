@@ -9,10 +9,17 @@ export default function MealControl({
   onOpenGuestHistory,
 }) {
   const [updatingGuest, setUpdatingGuest] = useState(false);
-  const [prices, setPrices] = useState({ veg: 0, egg: 0, fish: 0, chicken: 0 });
+  const [prices, setPrices] = useState({
+    veg: 0,
+    paneer: 0,
+    egg: 0,
+    fish: 0,
+    chicken: 0,
+  });
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [newPrices, setNewPrices] = useState({
     veg: "",
+    paneer: "",
     egg: "",
     fish: "",
     chicken: "",
@@ -50,12 +57,17 @@ export default function MealControl({
     };
   }, []);
 
+  // =========================================================================
+  // 🟢 ⏰ MEAL TIMING CONTROL SECTION (Lock/Unlock Timings)
+  // Ekhane apni apni nijer moton meal on/off korar somoy thik korte parben.
+  // Note: Somoy gulo 'Minute' e hiseb kora hoyeche. Example: Sokal 6:30 = 6 * 60 + 30
+  // =========================================================================
   const updateWindowStatus = () => {
     const now = new Date();
     const istTime = new Date(
       now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }),
     );
-    const hour = istTime.getHours();
+    const hour = istTime.getHours(); // 24-hour format
     const minute = istTime.getMinutes();
     const second = istTime.getSeconds();
 
@@ -66,19 +78,23 @@ export default function MealControl({
     let isLocked = false;
     let countdownStr = "";
 
-    const LUNCH_CLOSE_TIME = 6 * 60 + 30; // 6:30 AM
-    const DINNER_OPEN_TIME = 11 * 60; // 11:00 AM
-    const DINNER_CLOSE_TIME = 18 * 60; // 6:00 PM
-    const LUNCH_OPEN_TIME = 22 * 60; // 10:00 PM
+    // 🕒 TIMING CONFIGURATION (Change these numbers to adjust schedule)
+    // -------------------------------------------------------------------
+    const LUNCH_CLOSE_TIME = 6 * 60 + 30; // 6:30 AM (Erpor lunch off hoye jabe)
+    const DINNER_OPEN_TIME = 11 * 60; // 11:00 AM (Erpor Dinner on kora jabe)
+    const DINNER_CLOSE_TIME = 18 * 60; // 6:00 PM (Erpor Dinner off hoye jabe)
+    const LUNCH_OPEN_TIME = 22 * 60; // 10:00 PM (Erpor Next day-er lunch on kora jabe)
+    // -------------------------------------------------------------------
 
+    // Seconds calculation for Countdown Timer
     const LUNCH_CLOSE_SEC = 6 * 3600 + 30 * 60;
     const DINNER_CLOSE_SEC = 18 * 3600;
 
+    // 🔥 LOGIC: 10:00 PM theke 6:30 AM obdi (Lunch is Open)
     if (timeInMinutes >= LUNCH_OPEN_TIME || timeInMinutes < LUNCH_CLOSE_TIME) {
       type = "Lunch";
       isLocked = false;
 
-      // Countdown Logic for Lunch
       let diffSec = 0;
       if (timeInMinutes >= LUNCH_OPEN_TIME) {
         diffSec = 24 * 3600 - currentSec + LUNCH_CLOSE_SEC; // Next day
@@ -89,26 +105,31 @@ export default function MealControl({
       const m = Math.floor((diffSec % 3600) / 60);
       const s = diffSec % 60;
       countdownStr = `${h}h ${m}m ${s}s`;
-    } else if (
+    }
+    // 🔥 LOGIC: 6:30 AM theke 11:00 AM obdi (Lunch is Closed)
+    else if (
       timeInMinutes >= LUNCH_CLOSE_TIME &&
       timeInMinutes < DINNER_OPEN_TIME
     ) {
       type = "Lunch";
       isLocked = true;
-    } else if (
+    }
+    // 🔥 LOGIC: 11:00 AM theke 6:00 PM obdi (Dinner is Open)
+    else if (
       timeInMinutes >= DINNER_OPEN_TIME &&
       timeInMinutes < DINNER_CLOSE_TIME
     ) {
       type = "Dinner";
       isLocked = false;
 
-      // Countdown Logic for Dinner
       const diffSec = DINNER_CLOSE_SEC - currentSec;
       const h = Math.floor(diffSec / 3600);
       const m = Math.floor((diffSec % 3600) / 60);
       const s = diffSec % 60;
       countdownStr = `${h}h ${m}m ${s}s`;
-    } else if (
+    }
+    // 🔥 LOGIC: 6:00 PM theke 10:00 PM obdi (Dinner is Closed)
+    else if (
       timeInMinutes >= DINNER_CLOSE_TIME &&
       timeInMinutes < LUNCH_OPEN_TIME
     ) {
@@ -118,6 +139,7 @@ export default function MealControl({
 
     setMealWindow({ type, isLocked, countdown: countdownStr });
   };
+  // =========================================================================
 
   const checkAndAutoLock = async () => {
     const now = new Date();
@@ -151,11 +173,11 @@ export default function MealControl({
     const { data: validUsers } = await supabase
       .from("profiles")
       .select(
-        "id, full_name, room_no, mobile_number, meal_status, guest_veg_count, guest_egg_count, guest_fish_count, guest_chicken_count, roles(role_name)",
+        "id, full_name, room_no, mobile_number, meal_status, guest_veg_count, guest_paneer_count, guest_egg_count, guest_fish_count, guest_chicken_count, roles(role_name)",
       )
       .eq("is_approved", true)
       .or(
-        "meal_status.eq.true,guest_veg_count.gt.0,guest_egg_count.gt.0,guest_fish_count.gt.0,guest_chicken_count.gt.0",
+        "meal_status.eq.true,guest_veg_count.gt.0,guest_paneer_count.gt.0,guest_egg_count.gt.0,guest_fish_count.gt.0,guest_chicken_count.gt.0",
       );
 
     if (!validUsers || validUsers.length === 0) return;
@@ -180,9 +202,11 @@ export default function MealControl({
 
       const gTotal =
         (u.guest_veg_count || 0) +
+        (u.guest_paneer_count || 0) +
         (u.guest_egg_count || 0) +
         (u.guest_fish_count || 0) +
         (u.guest_chicken_count || 0);
+
       if (gTotal > 0) {
         for (let i = 0; i < (u.guest_veg_count || 0); i++)
           logsToInsert.push({
@@ -192,6 +216,15 @@ export default function MealControl({
             menu_name: finalMenuName,
             is_guest: true,
             guest_pref: "Veg",
+          });
+        for (let i = 0; i < (u.guest_paneer_count || 0); i++)
+          logsToInsert.push({
+            boarder_id: u.id,
+            log_date: logDate,
+            meal_session: targetSession,
+            menu_name: finalMenuName,
+            is_guest: true,
+            guest_pref: "Paneer",
           });
         for (let i = 0; i < (u.guest_egg_count || 0); i++)
           logsToInsert.push({
@@ -229,6 +262,7 @@ export default function MealControl({
           mobile_number: u.mobile_number || "N/A",
           meal_session: targetSession,
           veg_count: u.guest_veg_count || 0,
+          paneer_count: u.guest_paneer_count || 0,
           egg_count: u.guest_egg_count || 0,
           fish_count: u.guest_fish_count || 0,
           chicken_count: u.guest_chicken_count || 0,
@@ -245,6 +279,7 @@ export default function MealControl({
         .from("profiles")
         .update({
           guest_veg_count: 0,
+          guest_paneer_count: 0,
           guest_egg_count: 0,
           guest_fish_count: 0,
           guest_chicken_count: 0,
@@ -262,12 +297,14 @@ export default function MealControl({
     if (data && !error) {
       setPrices({
         veg: data.veg_price,
+        paneer: data.paneer_price || 0,
         egg: data.egg_price,
         fish: data.fish_price,
         chicken: data.chicken_price,
       });
       setNewPrices({
         veg: data.veg_price,
+        paneer: data.paneer_price || 0,
         egg: data.egg_price,
         fish: data.fish_price,
         chicken: data.chicken_price,
@@ -303,6 +340,7 @@ export default function MealControl({
       .from("guest_meal_prices")
       .update({
         veg_price: parseInt(newPrices.veg),
+        paneer_price: parseInt(newPrices.paneer),
         egg_price: parseInt(newPrices.egg),
         fish_price: parseInt(newPrices.fish),
         chicken_price: parseInt(newPrices.chicken),
@@ -318,6 +356,7 @@ export default function MealControl({
 
   const totalGuestMeals =
     (profile?.guest_veg_count || 0) +
+    (profile?.guest_paneer_count || 0) +
     (profile?.guest_egg_count || 0) +
     (profile?.guest_fish_count || 0) +
     (profile?.guest_chicken_count || 0);
@@ -331,7 +370,6 @@ export default function MealControl({
         </h3>
 
         <div className="mb-8 relative z-10 flex flex-col items-center">
-          {/* 🔥 LIVE COUNTDOWN BADGE WITH CUSTOM CLOSED MESSAGE */}
           <div
             className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold mb-6 transition-colors ${
               mealWindow.isLocked
@@ -342,7 +380,6 @@ export default function MealControl({
             <i
               className={`fas ${mealWindow.isLocked ? "fa-lock" : "fa-clock animate-pulse text-emerald-500"}`}
             ></i>
-
             {mealWindow.isLocked ? (
               mealWindow.type === "Lunch" ? (
                 "Lunch window is Closed ! Next Dinner window start from 11 AM"
@@ -439,7 +476,7 @@ export default function MealControl({
           )}
         </p>
 
-        {/* Responsive UI Grid for Guest Items */}
+        {/* 🔥 Responsive UI Grid (Kept compact: flows nicely on 2 columns) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Veg Guest */}
           <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm gap-1">
@@ -473,6 +510,46 @@ export default function MealControl({
               </span>
               <button
                 onClick={() => updateGuestCount("veg", true)}
+                disabled={updatingGuest || mealWindow.isLocked}
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
+              >
+                <i className="fas fa-plus text-[10px] sm:text-xs"></i>
+              </button>
+            </div>
+          </div>
+
+          {/* 🔥 Paneer Guest (New Addition) */}
+          <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm gap-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full bg-yellow-50 dark:bg-yellow-500/10 text-yellow-500 flex items-center justify-center">
+                <i className="fas fa-cheese text-[10px] sm:text-xs"></i>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200 truncate">
+                  PANEER
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-400">
+                  ₹{prices.paneer}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => updateGuestCount("paneer", false)}
+                disabled={
+                  updatingGuest ||
+                  !profile?.guest_paneer_count ||
+                  mealWindow.isLocked
+                }
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
+              >
+                <i className="fas fa-minus text-[10px] sm:text-xs"></i>
+              </button>
+              <span className="font-black w-3 sm:w-4 text-center text-xs sm:text-sm">
+                {profile?.guest_paneer_count || 0}
+              </span>
+              <button
+                onClick={() => updateGuestCount("paneer", true)}
                 disabled={updatingGuest || mealWindow.isLocked}
                 className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:bg-transparent transition-colors"
               >
@@ -622,6 +699,20 @@ export default function MealControl({
                     value={newPrices.veg}
                     onChange={(e) =>
                       setNewPrices({ ...newPrices, veg: e.target.value })
+                    }
+                    className="w-full border p-2.5 rounded-xl font-bold outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50 dark:bg-slate-950"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    Paneer Price (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={newPrices.paneer}
+                    onChange={(e) =>
+                      setNewPrices({ ...newPrices, paneer: e.target.value })
                     }
                     className="w-full border p-2.5 rounded-xl font-bold outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50 dark:bg-slate-950"
                     required
