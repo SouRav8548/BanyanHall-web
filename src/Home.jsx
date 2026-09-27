@@ -413,7 +413,7 @@ export default function Home() {
                       <span className="text-slate-900 dark:text-white font-black">
                         Boarder Adjustments:
                       </span>{" "}
-                      10:00 PM (Prev Night) to 6:30 AM
+                      08:00 PM (Prev Night) to 6:30 AM
                     </span>
                   </li>
                   <li className="flex items-start gap-3 bg-white/50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200/50 dark:border-slate-700/50 mt-2 backdrop-blur-sm">
