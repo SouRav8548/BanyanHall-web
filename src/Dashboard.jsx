@@ -106,21 +106,27 @@ export default function Dashboard() {
 
   const fetchUserData = async () => {
     try {
+      console.log("1. Checking auth session...");
       const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-      if (sessionError || !session) {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        console.warn("No active user found, redirecting to login...");
+        setLoading(false);
         navigate("/");
         return;
       }
+
+      console.log("2. User found:", user.id, "- Fetching profile...");
 
       const [profileRes, managersRes, cashierRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("*, roles(role_name)")
-          .eq("id", session.user.id)
-          .single(),
+          .eq("id", user.id)
+          .maybeSingle(),
         supabase
           .from("profiles")
           .select("full_name, room_no, mobile_number")
@@ -136,18 +142,21 @@ export default function Dashboard() {
       if (cashierRes.data) setCashierInfo(cashierRes.data);
 
       if (profileRes.data) {
+        console.log("3. Profile loaded successfully");
         setProfile(profileRes.data);
         const role = profileRes.data.roles?.role_name;
         if (role !== "Superintendent") fetchManagerStats();
         if (role === "Superintendent" || role === "Prefect Committee")
           fetchSuperintendentList();
-      } else if (profileRes.error) {
-        showToast("Error loading profile data.", "error");
+      } else {
+        console.error("Profile not found or error:", profileRes.error);
+        showToast("Profile data could not be loaded.", "error");
       }
     } catch (error) {
       console.error("Dashboard Load Error:", error);
-      showToast("Network issue detected. Please refresh the page.", "error");
+      showToast("Network issue detected. Please refresh.", "error");
     } finally {
+      // Guaranteed loading stop
       setLoading(false);
     }
   };
