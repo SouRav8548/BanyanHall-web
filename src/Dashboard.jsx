@@ -81,10 +81,15 @@ export default function Dashboard() {
     setTimeout(() => setToast({ show: false, message: "", type: "" }), 3500);
   };
 
+  // 🔥 NOTUN: 2-Minute Auto Refresh Timer
   useEffect(() => {
-    fetchUserData();
-    fetchNotice();
-  }, [navigate]);
+    const autoRefreshTimer = setInterval(() => {
+      // 120,000 milliseconds = 2 minutes
+      fetchUserData();
+      fetchNotice();
+    }, 120000);
+    return () => clearInterval(autoRefreshTimer);
+  }, []);
 
   const fetchNotice = async () => {
     try {

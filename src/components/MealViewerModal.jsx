@@ -31,11 +31,11 @@ export default function MealViewerModal({
     const isToday = selectedDate === todayStr;
 
     try {
-      // 1. Fetch Regular Active Profiles
+      // 1. Fetch Regular Active Profiles for Live Data / OFF meals
       const { data: profilesData, error: profErr } = await supabase
         .from("profiles")
         .select(
-          "id, full_name, room_no, mobile_number, meal_status, roles(role_name), guest_veg_count, guest_egg_count, guest_fish_count, guest_chicken_count",
+          "id, full_name, room_no, mobile_number, meal_status, roles(role_name), guest_veg_count, guest_paneer_count, guest_egg_count, guest_fish_count, guest_chicken_count",
         )
         .eq("is_approved", true);
 
@@ -44,78 +44,122 @@ export default function MealViewerModal({
       const validUsers =
         profilesData?.filter((p) => p.roles?.role_name !== "Superintendent") ||
         [];
-      const activeMealList = [];
-      const offMealList = [];
 
-      validUsers.forEach((p) => {
-        if (p.meal_status) activeMealList.push(p);
-        else offMealList.push(p);
-      });
-
-      setLogs(activeMealList);
-      setOffLogs(offMealList);
-
-      // 2. Fetch Guest Meal Data (Archived History vs Live)
-      // Check if history records exist for the selected date and session
-      const { data: historyData, error: histErr } = await supabase
-        .from("guest_meal_history")
-        .select("*, profiles(full_name, room_no, mobile_number)")
+      // =========================================================
+      // 🔥 2. FETCH STORED MEALS DIRECTLY FROM MAIN DATABASE
+      // =========================================================
+      const { data: savedLogs, error: logErr } = await supabase
+        .from("meal_logs")
+        .select(
+          "is_guest, guest_pref, boarder_id, profiles(full_name, room_no, mobile_number)",
+        )
         .eq("log_date", selectedDate)
         .eq("meal_session", selectedMealSession);
 
-      if (!histErr && historyData && historyData.length > 0) {
-        // Load from archived guest history
-        const formattedHistory = historyData.map((h) => {
-          const v = h.veg_count || 0;
-          const e = h.egg_count || 0;
-          const f = h.fish_count || 0;
-          const c = h.chicken_count || 0;
-          let prefStr = [];
-          if (v > 0) prefStr.push(`Veg: ${v}`);
-          if (e > 0) prefStr.push(`Egg: ${e}`);
-          if (f > 0) prefStr.push(`Fish: ${f}`);
-          if (c > 0) prefStr.push(`Chicken: ${c}`);
+      if (logErr) throw logErr;
 
-          return {
-            hostName: h.profiles?.full_name || "Unknown",
-            hostRoom: h.profiles?.room_no || "N/A",
-            hostPhone: h.profiles?.mobile_number || "N/A",
-            totalGuests: v + e + f + c,
-            pref: prefStr.join(", "),
-            isArchived: true,
-          };
-        });
-        setGuestLogs(formattedHistory);
-      } else if (isToday) {
-        // If today and before reset, fetch live from profiles
-        const liveGuests = [];
-        validUsers.forEach((p) => {
-          const v = p.guest_veg_count || 0;
-          const e = p.guest_egg_count || 0;
-          const f = p.guest_fish_count || 0;
-          const c = p.guest_chicken_count || 0;
-          const total = v + e + f + c;
+      // Checking if this session is already saved in database
+      const isSessionSaved = savedLogs && savedLogs.length > 0;
 
-          if (total > 0) {
-            let prefStr = [];
-            if (v > 0) prefStr.push(`Veg: ${v}`);
-            if (e > 0) prefStr.push(`Egg: ${e}`);
-            if (f > 0) prefStr.push(`Fish: ${f}`);
-            if (c > 0) prefStr.push(`Chicken: ${c}`);
+      if (isSessionSaved) {
+        // --- PROCESS REGULAR STORED MEALS ---
+        const activeIds = new Set();
+        const activeMealList = [];
 
-            liveGuests.push({
-              hostName: p.full_name,
-              hostRoom: p.room_no || "N/A",
-              hostPhone: p.mobile_number || "N/A",
-              totalGuests: total,
-              pref: prefStr.join(", "),
-              isArchived: false,
+        savedLogs.forEach((log) => {
+          if (!log.is_guest) {
+            activeIds.add(log.boarder_id);
+            activeMealList.push({
+              id: log.boarder_id,
+              full_name: log.profiles?.full_name || "Unknown",
+              room_no: log.profiles?.room_no || "N/A",
+              mobile_number: log.profiles?.mobile_number || "N/A",
             });
           }
         });
-        setGuestLogs(liveGuests);
+
+        // Set OFF meals (Valid users who are not in activeIds)
+        const offMealList = validUsers.filter((u) => !activeIds.has(u.id));
+        setLogs(activeMealList);
+        setOffLogs(offMealList);
+
+        // --- PROCESS GUEST STORED MEALS (Grouped by Boarder) ---
+        const guestGroup = {};
+        savedLogs.forEach((log) => {
+          if (log.is_guest) {
+            const bId = log.boarder_id;
+            if (!guestGroup[bId]) {
+              guestGroup[bId] = {
+                hostName: log.profiles?.full_name || "Unknown",
+                hostRoom: log.profiles?.room_no || "N/A",
+                hostPhone: log.profiles?.mobile_number || "N/A",
+                counts: { Veg: 0, Paneer: 0, Egg: 0, Fish: 0, Chicken: 0 },
+              };
+            }
+            if (log.guest_pref) {
+              guestGroup[bId].counts[log.guest_pref] =
+                (guestGroup[bId].counts[log.guest_pref] || 0) + 1;
+            }
+          }
+        });
+
+        const formattedGuestHistory = Object.values(guestGroup).map((g) => {
+          const c = g.counts;
+          const total = c.Veg + c.Paneer + c.Egg + c.Fish + c.Chicken;
+          return {
+            hostName: g.hostName,
+            hostRoom: g.hostRoom,
+            hostPhone: g.hostPhone,
+            totalGuests: total,
+            isArchived: true,
+            counts: c,
+          };
+        });
+
+        setGuestLogs(formattedGuestHistory);
       } else {
-        setGuestLogs([]);
+        // =========================================================
+        // 🔥 3. IF NOT SAVED YET (LIVE PREVIEW FOR TODAY)
+        // =========================================================
+        if (isToday) {
+          const activeMealList = [];
+          const offMealList = [];
+          const liveGuests = [];
+
+          validUsers.forEach((u) => {
+            // Live Regular
+            if (u.meal_status) activeMealList.push(u);
+            else offMealList.push(u);
+
+            // Live Guest
+            const v = u.guest_veg_count || 0;
+            const p = u.guest_paneer_count || 0;
+            const e = u.guest_egg_count || 0;
+            const f = u.guest_fish_count || 0;
+            const c = u.guest_chicken_count || 0;
+            const total = v + p + e + f + c;
+
+            if (total > 0) {
+              liveGuests.push({
+                hostName: u.full_name,
+                hostRoom: u.room_no || "N/A",
+                hostPhone: u.mobile_number || "N/A",
+                totalGuests: total,
+                isArchived: false,
+                counts: { Veg: v, Paneer: p, Egg: e, Fish: f, Chicken: c },
+              });
+            }
+          });
+
+          setLogs(activeMealList);
+          setOffLogs(offMealList);
+          setGuestLogs(liveGuests);
+        } else {
+          // Empty state for past dates that have no logs
+          setLogs([]);
+          setOffLogs([]);
+          setGuestLogs([]);
+        }
       }
     } catch (err) {
       console.error("Error fetching meal details:", err);
@@ -178,7 +222,8 @@ export default function MealViewerModal({
 
         {loading ? (
           <div className="py-20 text-center text-slate-500 font-bold">
-            Loading meal records...
+            <i className="fas fa-spinner fa-spin text-3xl mb-3 text-indigo-500"></i>
+            <p>Loading meal records from database...</p>
           </div>
         ) : (
           <div className="space-y-8 mt-6 overflow-y-auto flex-1 pr-2 custom-scrollbar">
@@ -239,7 +284,7 @@ export default function MealViewerModal({
               </div>
             </div>
 
-            {/* 2. GUEST MEALS (Live & Archived History for Auditor/Mess Prefect/Manager) */}
+            {/* 2. GUEST MEALS (From direct Database Connection) */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-lg font-black text-amber-700 dark:text-amber-400">
@@ -248,7 +293,8 @@ export default function MealViewerModal({
                 </h4>
                 {guestLogs.length > 0 && guestLogs[0]?.isArchived && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                    <i className="fas fa-archive mr-1"></i> Archived Log
+                    <i className="fas fa-database mr-1"></i> Loaded from
+                    Database
                   </span>
                 )}
               </div>
@@ -298,8 +344,34 @@ export default function MealViewerModal({
                               {g.hostPhone}
                             </a>
                           </td>
-                          <td className="p-3 font-semibold text-xs text-slate-600 dark:text-slate-400">
-                            {g.pref}
+                          <td className="p-3">
+                            <div className="flex gap-2 text-[10px] font-black uppercase tracking-wider flex-wrap">
+                              {g.counts.Veg > 0 && (
+                                <span className="bg-emerald-100 dark:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded">
+                                  Veg: {g.counts.Veg}
+                                </span>
+                              )}
+                              {g.counts.Paneer > 0 && (
+                                <span className="bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-800/50 text-yellow-700 dark:text-yellow-400 px-2 py-1 rounded">
+                                  Paneer: {g.counts.Paneer}
+                                </span>
+                              )}
+                              {g.counts.Egg > 0 && (
+                                <span className="bg-orange-100 dark:bg-orange-900/50 border border-orange-200 dark:border-orange-800/50 text-orange-700 dark:text-orange-400 px-2 py-1 rounded">
+                                  Egg: {g.counts.Egg}
+                                </span>
+                              )}
+                              {g.counts.Fish > 0 && (
+                                <span className="bg-blue-100 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 px-2 py-1 rounded">
+                                  Fish: {g.counts.Fish}
+                                </span>
+                              )}
+                              {g.counts.Chicken > 0 && (
+                                <span className="bg-rose-100 dark:bg-rose-900/50 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-400 px-2 py-1 rounded">
+                                  Chicken: {g.counts.Chicken}
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))

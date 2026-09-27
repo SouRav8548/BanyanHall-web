@@ -14,7 +14,14 @@ export default function MealLogger({ isManager }) {
   const [menuName, setMenuName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // 🔥 Smart IST Auto-Detector for Session & Date
+  // 🔥 Notun: Window Status & Auto-Save Triggers
+  const [windowStatus, setWindowStatus] = useState({
+    canSave: false,
+    message: "",
+  });
+  const [shouldAutoSave, setShouldAutoSave] = useState(false);
+
+  // 🔥 Smart IST Auto-Detector for Session, Date & Time Windows
   useEffect(() => {
     const calculateISTWindow = () => {
       const now = new Date();
@@ -27,17 +34,51 @@ export default function MealLogger({ isManager }) {
 
       let targetSession = "Morning";
       let targetDate = new Date(istTime);
+      let canSave = false;
+      let autoSaveTrigger = false;
+      let msg = "";
 
       if (timeInMinutes >= 390 && timeInMinutes < 1080) {
         // 6:30 AM to 5:59 PM -> Time to lock Today's Lunch
         targetSession = "Morning";
+        if (timeInMinutes >= 600 && timeInMinutes <= 720) {
+          // 10:00 AM to 12:00 PM (Lunch Manual Window)
+          canSave = true;
+          msg = "Lunch save window is OPEN (Closes at 12:00 PM)";
+        } else if (timeInMinutes > 720) {
+          // 12:01 PM to 5:59 PM (Lunch Window Missed)
+          canSave = false;
+          autoSaveTrigger = true;
+          msg = "Lunch window missed. System Auto-Saved.";
+        } else {
+          // 6:30 AM to 9:59 AM
+          canSave = false;
+          msg = "Lunch save window will open at 10:00 AM";
+        }
       } else if (timeInMinutes >= 1080) {
         // 6:00 PM to 11:59 PM -> Time to lock Today's Dinner
         targetSession = "Dinner";
+        if (timeInMinutes >= 1200 && timeInMinutes <= 1380) {
+          // 8:00 PM to 11:00 PM (Dinner Manual Window)
+          canSave = true;
+          msg = "Dinner save window is OPEN (Closes at 11:00 PM)";
+        } else if (timeInMinutes > 1380) {
+          // 11:01 PM to 11:59 PM (Dinner Window Missed)
+          canSave = false;
+          autoSaveTrigger = true;
+          msg = "Dinner window missed. System Auto-Saved.";
+        } else {
+          // 6:00 PM to 7:59 PM
+          canSave = false;
+          msg = "Dinner save window will open at 8:00 PM";
+        }
       } else {
         // 12:00 AM to 6:29 AM -> Time to lock Yesterday's Dinner
         targetSession = "Dinner";
         targetDate.setDate(targetDate.getDate() - 1);
+        canSave = false;
+        autoSaveTrigger = true; // Jodi kal rate keu save na kore thake
+        msg = "Dinner window missed. System Auto-Saved.";
       }
 
       // Local IST formatting
@@ -50,6 +91,9 @@ export default function MealLogger({ isManager }) {
         setSelectedDate(dateString);
         setSession(targetSession);
       }
+
+      setWindowStatus({ canSave, message: msg });
+      setShouldAutoSave(autoSaveTrigger);
     };
 
     calculateISTWindow();
@@ -61,7 +105,7 @@ export default function MealLogger({ isManager }) {
     if (selectedDate && session) {
       checkData();
     }
-  }, [selectedDate, session]);
+  }, [selectedDate, session, shouldAutoSave]);
 
   const checkData = async () => {
     setLoading(true);
@@ -83,11 +127,11 @@ export default function MealLogger({ isManager }) {
       const { data } = await supabase
         .from("profiles")
         .select(
-          "id, full_name, room_no, mobile_number, meal_status, guest_veg_count, guest_egg_count, guest_fish_count, guest_chicken_count, roles(role_name)",
+          "id, full_name, room_no, mobile_number, meal_status, guest_veg_count, guest_paneer_count, guest_egg_count, guest_fish_count, guest_chicken_count, roles(role_name)",
         )
         .eq("is_approved", true)
         .or(
-          "meal_status.eq.true,guest_veg_count.gt.0,guest_egg_count.gt.0,guest_fish_count.gt.0,guest_chicken_count.gt.0",
+          "meal_status.eq.true,guest_veg_count.gt.0,guest_paneer_count.gt.0,guest_egg_count.gt.0,guest_fish_count.gt.0,guest_chicken_count.gt.0",
         );
 
       if (data) {
@@ -99,26 +143,45 @@ export default function MealLogger({ isManager }) {
           if (u.meal_status) totalMeals++;
           totalMeals +=
             (u.guest_veg_count || 0) +
+            (u.guest_paneer_count || 0) + // Paneer count added
             (u.guest_egg_count || 0) +
             (u.guest_fish_count || 0) +
             (u.guest_chicken_count || 0);
         });
         setActiveCount(totalMeals);
         setUsersToLog(validUsers);
+
+        // 🔥 Auto-Save Check: Jodi save na kora thake ar time periye jay
+        if (shouldAutoSave && totalMeals > 0 && !isSaving) {
+          handleSaveLogs(true, validUsers, totalMeals);
+        }
       }
     }
     setLoading(false);
   };
 
-  const handleSaveLogs = async () => {
-    if (activeCount === 0) return alert("No active meals to save.");
+  // 🔥 isAuto parameter add kora holo auto-save er jonno
+  const handleSaveLogs = async (
+    isAuto = false,
+    autoUsers = [],
+    autoCount = 0,
+  ) => {
+    const usersProcess = isAuto ? autoUsers : usersToLog;
+    const countProcess = isAuto ? autoCount : activeCount;
+
+    if (countProcess === 0) return !isAuto && alert("No active meals to save.");
+
     const baseMenu = "Rice & Dal";
-    const finalMenuName = menuName.trim()
-      ? `${baseMenu} + ${menuName.trim()}`
-      : baseMenu;
+    const finalMenuName = isAuto
+      ? `${baseMenu} (Auto-Saved)`
+      : menuName.trim()
+        ? `${baseMenu} + ${menuName.trim()}`
+        : baseMenu;
+
     if (
+      !isAuto &&
       !window.confirm(
-        `Are you sure you want to lock and save ${activeCount} meals (including guests) for ${session === "Morning" ? "Lunch" : "Dinner"}?`,
+        `Are you sure you want to lock and save ${countProcess} meals (including guests) for ${session === "Morning" ? "Lunch" : "Dinner"}?`,
       )
     )
       return;
@@ -128,7 +191,7 @@ export default function MealLogger({ isManager }) {
     const guestHistoryToInsert = [];
     const guestIdsToReset = [];
 
-    usersToLog.forEach((u) => {
+    usersProcess.forEach((u) => {
       // Regular Meal Insert
       if (u.meal_status)
         logsToInsert.push({
@@ -142,9 +205,11 @@ export default function MealLogger({ isManager }) {
       // Guest Meals Insert & History Tracking
       const gTotal =
         (u.guest_veg_count || 0) +
+        (u.guest_paneer_count || 0) + // Paneer count included
         (u.guest_egg_count || 0) +
         (u.guest_fish_count || 0) +
         (u.guest_chicken_count || 0);
+
       if (gTotal > 0) {
         for (let i = 0; i < (u.guest_veg_count || 0); i++)
           logsToInsert.push({
@@ -155,6 +220,18 @@ export default function MealLogger({ isManager }) {
             is_guest: true,
             guest_pref: "Veg",
           });
+
+        // Paneer Guest Log Loop
+        for (let i = 0; i < (u.guest_paneer_count || 0); i++)
+          logsToInsert.push({
+            boarder_id: u.id,
+            log_date: selectedDate,
+            meal_session: session,
+            menu_name: finalMenuName,
+            is_guest: true,
+            guest_pref: "Paneer",
+          });
+
         for (let i = 0; i < (u.guest_egg_count || 0); i++)
           logsToInsert.push({
             boarder_id: u.id,
@@ -192,6 +269,7 @@ export default function MealLogger({ isManager }) {
           mobile_number: u.mobile_number || "N/A",
           meal_session: session,
           veg_count: u.guest_veg_count || 0,
+          paneer_count: u.guest_paneer_count || 0, // Save to history
           egg_count: u.guest_egg_count || 0,
           fish_count: u.guest_fish_count || 0,
           chicken_count: u.guest_chicken_count || 0,
@@ -209,6 +287,7 @@ export default function MealLogger({ isManager }) {
           .from("profiles")
           .update({
             guest_veg_count: 0,
+            guest_paneer_count: 0, // Paneer count auto-reset to 0
             guest_egg_count: 0,
             guest_fish_count: 0,
             guest_chicken_count: 0,
@@ -216,11 +295,12 @@ export default function MealLogger({ isManager }) {
           .in("id", guestIdsToReset);
       }
 
-      alert("Meals logged & Guest counts auto-reset to 0!");
+      if (!isAuto) alert("Meals logged & Guest counts auto-reset to 0!");
       setMenuName("");
       checkData();
     } else {
-      alert("Error saving logs: " + error.message);
+      if (!isAuto) alert("Error saving logs: " + error.message);
+      else console.error("Auto-save failed:", error.message);
     }
     setIsSaving(false);
   };
@@ -233,8 +313,10 @@ export default function MealLogger({ isManager }) {
             <i className="fas fa-clipboard-check text-emerald-500"></i> Daily
             Meal Logger
           </h2>
-          <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-wider">
-            Date & Session Auto-Synchronized (IST)
+          <p
+            className={`text-[10px] font-bold mt-1 uppercase tracking-wider ${windowStatus.canSave ? "text-emerald-500" : "text-amber-500"}`}
+          >
+            {windowStatus.message}
           </p>
         </div>
         <div className="flex gap-3">
@@ -291,22 +373,27 @@ export default function MealLogger({ isManager }) {
                   placeholder="e.g. Dim Kosha"
                   value={menuName}
                   onChange={(e) => setMenuName(e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border border-amber-300 dark:border-amber-600 bg-white dark:bg-slate-900 text-sm font-bold outline-none focus:border-amber-500"
+                  disabled={!windowStatus.canSave}
+                  className="w-full px-4 py-2 rounded-lg border border-amber-300 dark:border-amber-600 bg-white dark:bg-slate-900 text-sm font-bold outline-none focus:border-amber-500 disabled:opacity-50"
                 />
               </div>
               <button
-                onClick={handleSaveLogs}
-                disabled={isSaving}
-                className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-lg whitespace-nowrap disabled:opacity-50 transition-colors"
+                onClick={() => handleSaveLogs(false)}
+                disabled={isSaving || !windowStatus.canSave}
+                className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-lg whitespace-nowrap disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
                 {isSaving ? (
                   <>
-                    <i className="fas fa-spinner fa-spin mr-2"></i> Saving...
+                    <i className="fas fa-spinner fa-spin"></i> Saving...
+                  </>
+                ) : !windowStatus.canSave ? (
+                  <>
+                    <i className="fas fa-clock"></i> Window Closed
                   </>
                 ) : (
                   <>
-                    <i className="fas fa-save mr-2"></i> Lock & Save (
-                    {activeCount} Meals)
+                    <i className="fas fa-save"></i> Lock & Save ({activeCount}{" "}
+                    Meals)
                   </>
                 )}
               </button>
