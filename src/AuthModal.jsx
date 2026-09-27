@@ -230,7 +230,7 @@ export default function AuthModal({ isOpen, onClose, initialMode }) {
 
                 <div className="relative">
                   <label className="absolute -top-2 left-2 text-[10px] font-bold text-slate-500 bg-white dark:bg-slate-900 px-1">
-                    Admission Date
+                    Hostel Admission Date
                   </label>
                   <input
                     type="date"
