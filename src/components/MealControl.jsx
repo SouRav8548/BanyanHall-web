@@ -83,7 +83,7 @@ export default function MealControl({
     const LUNCH_CLOSE_TIME = 6 * 60 + 30; // 6:30 AM (Erpor lunch off hoye jabe)
     const DINNER_OPEN_TIME = 11 * 60; // 11:00 AM (Erpor Dinner on kora jabe)
     const DINNER_CLOSE_TIME = 18 * 60; // 6:00 PM (Erpor Dinner off hoye jabe)
-    const LUNCH_OPEN_TIME = 22 * 60; // 10:00 PM (Erpor Next day-er lunch on kora jabe)
+    const LUNCH_OPEN_TIME = 20 * 60; // 08:00 PM (Erpor Next day-er lunch on kora jabe)
     // -------------------------------------------------------------------
 
     // Seconds calculation for Countdown Timer
